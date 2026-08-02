@@ -1,0 +1,327 @@
+# yaml-language-server: $schema=https://modelith.sh/schema/domain-model/v1.json
+kind: DomainModel
+version: v1
+title: Skillet Domain Model
+description: >
+  The shared domain behind the `github.com/StevenACoffman/skillet` library:
+  knowledge artifacts and their verification. A `Source` is distilled through a
+  `Prompt` into a `Ruleset` of `Rules`; those inform a `Skill`; and a `Check`
+  produces `Findings` recorded in a `Manifest` and gated by a `Proof`.
+
+glossary:
+  Author: >
+    The person who writes a `Source` or a `Skill`. Not a system user — the human
+    whose expertise the pipeline captures.
+  Reviewer: >
+    The person or cold agent that runs a `Check` over a `Skill` and reads its
+    `Findings`.
+  Diagnostic: >
+    A static statement about an artifact — severity, location, message. This is
+    exactly what a `Finding` is in skillet.
+  Hypothesis: >
+    An adjudication claim that only counts once an artifact is run to confirm it
+    (the agentic-dev-harness sense). A `Finding` here is deliberately a
+    `Diagnostic`, never a `Hypothesis`.
+  RedLight: >
+    Wording or a path that binds a `Skill` to a single runtime; the neutrality
+    scan flags it so other runtimes still accept the `Skill`.
+  Frontmatter: >
+    The YAML head of a `Skill`, delimited by "---" lines, carrying its name and
+    description.
+  ContentHash: >
+    The content identity of an artifact: the first 16 hex characters of its
+    sha256 digest, identical across every skillet tool.
+
+enums:
+  RuleSeverity:
+    description: How strictly a `Rule` is enforced.
+    values:
+      - name: MUST
+        definition: Block on violation; never generate the counter-example.
+      - name: SHOULD
+        definition: Flag with justification; avoid in generation.
+      - name: CONSIDER
+        definition: Raise only when asked; prefer but do not enforce.
+  RuleLevel:
+    description: Where a `Rule` applies.
+    values:
+      - name: CODE
+        definition: Expression, function, or module-level code pattern.
+      - name: ARCH
+        definition: System structure, service boundaries, data flow.
+      - name: METHOD
+        definition: Process or workflow — testing, deployment, sequencing.
+  FindingSeverity:
+    description: The weight of a `Finding`.
+    values:
+      - name: error
+        definition: A blocking defect the `Reviewer` must resolve.
+      - name: warning
+        definition: An advisory gap that does not block on its own.
+  CheckOp:
+    description: The deterministic operation a `Check` performs on output.
+    values:
+      - name: section_present
+        definition: A named section heading exists and is non-empty.
+      - name: contains
+        definition: The output contains a required phrase.
+      - name: tool_called
+        definition: A named tool was invoked.
+      - name: max_chars
+        definition: The output is at most N characters.
+      - name: min_chars
+        definition: The output is at least N characters.
+
+entities:
+  Source:
+    definition: >
+      A prose document of domain expertise — a blog post, article, or paper —
+      that the pipeline distills. A `Source` is the authority its `Ruleset` may
+      not contradict; when it disagrees with a model's defaults, the `Source`
+      wins.
+    attributes:
+      - name: title
+        type: string
+    actions:
+      - name: distill
+        actor: Author
+        preserves: [source-is-authoritative]
+    invariants:
+      - id: source-is-authoritative
+        statement: "A `Ruleset` derived from a `Source` never asserts beyond what the `Source` supports."
+
+  Prompt:
+    definition: >
+      A generated instruction that tells a model to distil one `Source` into a
+      `Ruleset`. It is a working artifact of the pipeline, not a deliverable.
+    relationships:
+      - entity: Source
+        cardinality: "n:1"
+        ownership: referenced
+        note: The `Source` this prompt distills
+    attributes:
+      - name: target
+        type: string
+    actions:
+      - generate
+    invariants:
+      - id: prompt-targets-one-source
+        statement: "A `Prompt` distills exactly one `Source`."
+
+  Ruleset:
+    definition: >
+      A distilled set of executable `Rules` derived from a single `Source`.
+      Loaded as context, it overrides a model's defaults where the `Source`
+      speaks.
+    relationships:
+      - entity: Source
+        cardinality: "n:1"
+        ownership: referenced
+      - entity: Rule
+        cardinality: "1:n"
+        ownership: owned
+        note: The `Rules` it contains
+    attributes:
+      - name: scope
+        type: string
+    actions:
+      - synthesize
+      - name: refine
+        actor: Reviewer
+        preserves: [ruleset-derives-from-one-source]
+    invariants:
+      - id: ruleset-derives-from-one-source
+        statement: "A `Ruleset` derives from exactly one `Source`."
+
+  Rule:
+    definition: >
+      One atomic, mechanically applicable constraint: an imperative, a rationale
+      naming the failure mode, and a ✓/✗ example pair. It belongs to exactly one
+      `Ruleset`.
+    attributes:
+      - name: severity
+        type: RuleSeverity
+      - name: level
+        type: RuleLevel
+      - name: section
+        type: string
+    actions:
+      - create
+    invariants:
+      - id: rule-has-severity-and-level
+        statement: "Every `Rule` carries a severity and a level."
+      - id: rule-belongs-to-one-ruleset
+        statement: "Every `Rule` belongs to exactly one `Ruleset`."
+
+  Skill:
+    definition: >
+      A SKILL.md artifact: `Frontmatter` plus a Markdown body, authored to be
+      installable by any agent runtime. Its `ContentHash` gives it a stable
+      identity across tools.
+    relationships:
+      - entity: Ruleset
+        cardinality: "n:n"
+        ownership: referenced
+        note: The `Rulesets` compiled into this skill, if any
+    attributes:
+      - name: name
+        type: string
+      - name: bytes
+        type: integer
+      - name: contentHash
+        type: string
+    actions:
+      - name: lint
+        actor: Reviewer
+      - scan
+      - name: verify
+        preserves: [skill-runtime-neutral]
+    invariants:
+      - id: skill-has-frontmatter
+        statement: "A `Skill` has `Frontmatter` with a name and a description."
+      - id: skill-runtime-neutral
+        statement: "A `Skill` contains no `RedLight` wording, so any runtime accepts it."
+
+  Check:
+    definition: >
+      A deterministic verification operation applied to a `Skill` or model
+      output. It names the artifact that would confirm it, so a `Finding` can be
+      re-run rather than trusted on its text.
+    relationships:
+      - entity: Skill
+        cardinality: "n:n"
+        ownership: referenced
+        note: The `Skills` it verifies
+    attributes:
+      - name: op
+        type: CheckOp
+      - name: arg
+        type: string
+    actions:
+      - run
+    invariants:
+      - id: check-names-an-artifact
+        statement: "A `Check` names the artifact whose run confirms or clears it."
+
+  Finding:
+    definition: >
+      A static `Diagnostic` a `Check` produces about a `Skill`: a severity, a
+      category, a location, and a message. It is not an adjudication
+      `Hypothesis` — it is resolved by re-running its `Check`.
+    relationships:
+      - entity: Check
+        cardinality: "n:1"
+        ownership: referenced
+        note: The `Check` that produced it
+      - entity: Skill
+        cardinality: "n:1"
+        ownership: referenced
+        note: The `Skill` it flags
+    attributes:
+      - name: severity
+        type: FindingSeverity
+      - name: category
+        type: string
+      - name: message
+        type: string
+    actions:
+      - name: raise
+        preserves: [finding-is-a-diagnostic]
+    invariants:
+      - id: finding-is-a-diagnostic
+        statement: "A `Finding` is a static `Diagnostic`, never an adjudication `Hypothesis`."
+      - id: finding-cites-its-check
+        statement: "A `Finding` cites the `Check` that produced it."
+
+  Manifest:
+    definition: >
+      The verification record over a set of `Skills`: each skill's `ContentHash`
+      and whether every gate passed. It is the auditable output of a verify run.
+    relationships:
+      - entity: Skill
+        cardinality: "1:n"
+        ownership: referenced
+        note: The `Skills` it records
+      - entity: Proof
+        cardinality: "1:0..1"
+        ownership: referenced
+        note: The `Proof` that gates closing, if required
+    attributes:
+      - name: structureVerified
+        type: boolean
+    actions:
+      - build
+      - name: verify
+        actor: Reviewer
+        preserves: [manifest-verified-iff-all-gates-pass]
+    invariants:
+      - id: manifest-verified-iff-all-gates-pass
+        statement: "A `Manifest` is marked verified only when every recorded `Skill` passes its gates."
+
+  Proof:
+    definition: >
+      A content-addressed manifest of artifacts that must exist and match their
+      `ContentHash` before a `Manifest` can close — the no-proof-no-close gate.
+    attributes:
+      - name: hashAlgorithm
+        type: string
+      - name: artifactCount
+        type: integer
+        derived: true
+        derivation: The number of artifacts the `Proof` declares.
+    actions:
+      - create
+      - name: verify
+        preserves: [proof-artifacts-hash-match]
+    invariants:
+      - id: proof-artifacts-hash-match
+        statement: "Every artifact a `Proof` declares exists and matches its recorded `ContentHash`."
+
+scenarios:
+  - name: Distill a source into a ruleset
+    description: >
+      An `Author` turns prose expertise into executable constraints: a `Prompt`
+      is generated for the `Source`, a model distils it into a `Ruleset`, and
+      each `Rule` gets a severity and level.
+    actors: [Author]
+    steps:
+      - "A `Prompt` is generated for the `Source`"
+      - "A model distils the `Source` into a `Ruleset`"
+      - "Each `Rule` in the `Ruleset` is given a severity and a level"
+    invariants_touched: [source-is-authoritative, ruleset-derives-from-one-source, rule-has-severity-and-level]
+
+  - name: Verify a skill tree
+    description: >
+      A `Reviewer` runs each `Check` over every `Skill`, first scanning for
+      `RedLight` wording; the `Findings` are recorded in a `Manifest` that is
+      marked verified only if nothing blocking remains.
+    actors: [Reviewer]
+    steps:
+      - "Each `Skill` is scanned for `RedLight` wording"
+      - "A `Reviewer` runs each `Check` and collects its `Findings`"
+      - "The `Findings` are recorded in a `Manifest`"
+    invariants_touched: [skill-runtime-neutral, finding-is-a-diagnostic, manifest-verified-iff-all-gates-pass]
+
+  - name: Prove and close
+    description: >
+      Before a `Manifest` closes, a `Proof` is created over the declared
+      artifacts and each is re-hashed to its `ContentHash`; any mismatch blocks
+      the close.
+    actors: [Reviewer]
+    steps:
+      - "A `Proof` is created over the artifacts a `Manifest` declares"
+      - "Each artifact is re-hashed and compared to its `ContentHash`"
+      - "The `Manifest` closes only when every artifact matches"
+    invariants_touched: [proof-artifacts-hash-match, manifest-verified-iff-all-gates-pass]
+
+# Model-level invariants: cross-entity rules with no single owner.
+invariants:
+  - id: hash-identity-frozen
+    statement: >
+      `ContentHash` is the first 16 hex characters of a sha256 digest and is
+      byte-identical across every skillet tool, so an artifact has one identity
+      everywhere.
+  - id: neutrality-is-shared
+    statement: >
+      The `RedLight` set that defines runtime-binding is byte-identical across
+      tools, so they never disagree about whether a `Skill` is runtime-neutral.
