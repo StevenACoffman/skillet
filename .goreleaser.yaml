@@ -64,8 +64,25 @@ changelog:
       - "^test:"
 
 release:
-  footer: >-
+  footer: |
+    ## Verifying this release
+
+    ```bash
+    # 1. cosign signature over the checksum file (identity = the release workflow).
+    cosign verify-blob \
+      --bundle checksums.txt.sigstore.json \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      --certificate-identity 'https://github.com/StevenACoffman/skillet/.github/workflows/release.yml@refs/tags/{{ .Tag }}' \
+      checksums.txt
+
+    # 2. source tarball + SBOM hash to the now-trusted checksums.
+    shasum -a 256 -c checksums.txt
+
+    # 3. GitHub build provenance.
+    gh attestation verify {{ .ProjectName }}_{{ .Version }}_source.tar.gz --repo StevenACoffman/skillet
+    ```
+
+    The SBOM is `{{ .ProjectName }}_{{ .Version }}_source.tar.gz.sbom.json` (SPDX-2.3).
 
     ---
-
     Released by [GoReleaser](https://github.com/goreleaser/goreleaser).
