@@ -1,4 +1,4 @@
-# skillet TODO
+# Skillet TODO
 
 `github.com/StevenACoffman/skillet` — shared library extracted from
 `ai-skill`/`distill`, `exegesis`, `agentic-dev-harness` (adh), and `skillsaw`.
@@ -8,26 +8,26 @@ prompts, and the findings / checks / proofs that certify them.
 Scope boundary: **CLI scaffolding and the machine-output envelope do NOT live here.**
 They belong to `climax` (see that repo's TODO.md). skillet is domain code only.
 
-## Preserve mature libraries (hard constraint)
+## Preserve Mature Libraries (Hard Constraint)
 
 Where two source repos agree, keep whatever third-party library the originals used to
 offload a job; only resolve a library where the two apps genuinely conflict.
 
-| Concern | Original library | Repos | Decision |
-|---|---|---|---|
-| YAML frontmatter parse | `github.com/goccy/go-yaml` | exegesis, skillsaw | keep (both agree) |
-| Markdown structural parse | `github.com/yuin/goldmark` (+GFM) | skillsaw | keep; exegesis regex is the weaker fork → converge on goldmark |
-| Content hash | stdlib `crypto/sha256`,`encoding/hex` | all | keep stdlib (byte-identical to SkillOpt) |
-| Red-light scan | stdlib `regexp` | exegesis, skillsaw | keep stdlib |
-| Dir/marker discovery | stdlib `os`,`path/filepath` | exegesis, skillsaw | keep stdlib; add `io/fs` seam for testability |
-| Atomic file write | vendored Tailscale `atomicfile` (BSD-3) + `golang.org/x/sys` | adh | copy verbatim incl. LICENSE; not a go-get dep to swap |
-| TOML config | `github.com/BurntSushi/toml` | adh | keep when config lands |
-| Git provenance | `github.com/go-git/go-git/v6` | adh | keep when proof/provenance lands |
+| Concern                   | Original library                                             | Repos              | Decision                                                       |
+| ------------------------- | ------------------------------------------------------------ | ------------------ | -------------------------------------------------------------- |
+| YAML frontmatter parse    | `github.com/goccy/go-yaml`                                   | exegesis, skillsaw | keep (both agree)                                              |
+| Markdown structural parse | `github.com/yuin/goldmark` (+GFM)                            | skillsaw           | keep; exegesis regex is the weaker fork → converge on goldmark |
+| Content hash              | stdlib `crypto/sha256`,`encoding/hex`                        | all                | keep stdlib (byte-identical to SkillOpt)                       |
+| Red-light scan            | stdlib `regexp`                                              | exegesis, skillsaw | keep stdlib                                                    |
+| Dir/marker discovery      | stdlib `os`,`path/filepath`                                  | exegesis, skillsaw | keep stdlib; add `io/fs` seam for testability                  |
+| Atomic file write         | vendored Tailscale `atomicfile` (BSD-3) + `golang.org/x/sys` | adh                | copy verbatim incl. LICENSE; not a go-get dep to swap          |
+| TOML config               | `github.com/BurntSushi/toml`                                 | adh                | keep when config lands                                         |
+| Git provenance            | `github.com/go-git/go-git/v6`                                | adh                | keep when proof/provenance lands                               |
 
 Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.4`,
 `golang.org/x/sys@v0.47.0`.
 
-## Design decisions (locked)
+## Design Decisions (Locked)
 
 - **`finding` = static diagnostic** `{Severity,Category,Path,Message}` (exegesis lint,
   modelith-shaped). adh's `Finding` is a *hypothesis to adjudicate* — it stays in adh,
@@ -72,44 +72,53 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
 - **`stats`/`ratchet`/`auditlog` have one consumer (skillsaw) today** — extracted faithfully as
   working code; their shape may shift when adh's `verdict` becomes the 2nd consumer.
 
-## Package backlog (dependency order)
+## Package Backlog (Dependency Order)
 
-### Kernel (this slice)
+### Kernel (This Slice)
+
 - [x] `identity` — `Hash(string) string` (sha256[:16]).            src: exegesis, adh, skillsaw
 - [x] `neutrality` — `Scan([]NamedFile) []Hit` red-light regex.    src: exegesis, adh, skillsaw (byte-identical)
 - [x] `fsutil` — dir/marker discovery over `io/fs`.                src: exegesis, skillsaw (conflict resolved)
 
-### Kernel (next)
+### Kernel (Next)
+
 - [x] `errs` — `Error{Code,Op,Message,Err}` + codes + `ErrorCode`/`ErrorMessage`.  src: adh
 - [x] `atomicfile` — `WriteFile`, `Rename` (vendored Tailscale, lint-excluded).    src: adh
 
 ### Document
+
 - [x] `markdown` — goldmark `Parse` → `Doc{Sections,Prose,Links,HasOrderedList}`.  src: skillsaw⊃exegesis (goldmark)
 - [x] `naming` — `Title`/`RulesFilename`/`PromptFilename`/`TitleFromMarkdown`/`TitleFromFile`. (`Slug` lives in `skill`.)  src: distill
 
-### Skill artifact
+### Skill Artifact
+
 - [x] `skill` — `Skill{...}`, `Load`, `Discover`/`DiscoverRoots`(over fsutil), `DefaultRoots`, `Slug`, `Hash()`→identity.  src: exegesis, skillsaw (goccy/go-yaml)
 - [x] `manifest` — `Manifest{Tool,Tree,StructureVerified,Skills[]}` + per-skill sha256 (`Tool` is a Build param, not hardcoded).  src: exegesis
 
 ### Verification
+
 - [x] `finding` — `Diagnostic{Severity,Category,Path,Message}`; `Result`; deterministic `Sort`.  src: exegesis, modelith-shaped
 - [x] `judge` — `Check{Op,Arg}`, op set + objective answer-scoring, `Score`→`Result{Hard,Soft,Why}`.  src: skillsaw⊃exegesis
 - [x] `testprompts` — `File`/`Case`/`Parse`(3 shapes)/`Write`/`Validate`/`Scaffold`/`DeriveChecks`/`Behavioral`/`Decoys`/`Find`/`ChecksFor`.  src: exegesis, skillsaw
 
-### Experiment adjudication (single-consumer today; shape may shift when adh `verdict` is the 2nd consumer)
+### Experiment Adjudication (Single-Consumer Today; Shape May Shift When Adh `verdict` Is the 2nd Consumer)
+
 - [x] `stats` — `Wilson(k,n)`.                                     src: skillsaw (adh `verdict` adjacent)
 - [x] `ratchet` — `Evaluate`/`SelectScore` gate + activation `Score` confusion matrix (one package, 2 files).  src: skillsaw
 - [x] `auditlog` — `Row` + `Read`/`Append` (results.tsv).          src: skillsaw
 
-### Rules / distillation
+### Rules / Distillation
+
 - [x] `ruleset` — typed `Rule`/`Ruleset` (§, Severity MUST/SHOULD/CONSIDER, Level CODE/ARCH/METHOD) + `Render`/`Parse` (canonical form).  src: distill (greenfield)
 - [x] `ruleset/distill` — source-tree → prompt generation (`FillTemplate`/`Generate`, over `naming`).  src: ai-skill main.go
 
-### Provenance / proof
+### Provenance / Proof
+
 - [x] `proof` — `Artifact{Path,Digest}`, `Packet`, `Create`/`Save`/`Load`/`Verify` (on `errs`/`atomicfile`/`identity`).  src: adh
 - [x] `provenance` — vendored header `{Vendored,Origin,Ref,Commit,Imported,Digest}` + `Stamp`/`Parse`/`Digest`.  src: modelith-style (generalized)
 
-## Consumer migration (after each context lands)
+## Consumer Migration (After Each Context Lands)
+
 - [x] exegesis → deleted `internal/{skill,neutrality,testprompts,manifest}`; repointed to skillet.
       Kept `internal/{lint,overview,registry}` (lint repointed to skillet skill+neutrality). `manifest.Build`
       call passes `"exegesis"`; `skill.Hash(s.Raw)` → `s.Hash()`. `lint.Finding` kept (finding→skillet
@@ -130,5 +139,6 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       `skillet/naming` (with the `run()`-returns-int shape). `replace => ../../../git/skillet`. Build + smoke
       (8 prompts, matches original) + golangci all green. Dropped `-dry-run` (skillet's Generate always writes).
 
-## Domain model
+## Domain Model
+
 - [x] `skillet.modelith.yaml` + rendered `.md` capturing the entities/relationships above (authored with modelith; `modelith lint` clean).

@@ -20,42 +20,42 @@ The shared domain behind the `github.com/StevenACoffman/skillet` library: knowle
 
 The deterministic operation a `Check` performs on output.
 
-| Value | Definition |
-| --- | --- |
+| Value             | Definition                                       |
+| ----------------- | ------------------------------------------------ |
 | `section_present` | A named section heading exists and is non-empty. |
-| `contains` | The output contains a required phrase. |
-| `tool_called` | A named tool was invoked. |
-| `max_chars` | The output is at most N characters. |
-| `min_chars` | The output is at least N characters. |
+| `contains`        | The output contains a required phrase.           |
+| `tool_called`     | A named tool was invoked.                        |
+| `max_chars`       | The output is at most N characters.              |
+| `min_chars`       | The output is at least N characters.             |
 
 ### `FindingSeverity`
 
 The weight of a `Finding`.
 
-| Value | Definition |
-| --- | --- |
-| `error` | A blocking defect the `Reviewer` must resolve. |
+| Value     | Definition                                      |
+| --------- | ----------------------------------------------- |
+| `error`   | A blocking defect the `Reviewer` must resolve.  |
 | `warning` | An advisory gap that does not block on its own. |
 
 ### `RuleLevel`
 
 Where a `Rule` applies.
 
-| Value | Definition |
-| --- | --- |
-| `CODE` | Expression, function, or module-level code pattern. |
-| `ARCH` | System structure, service boundaries, data flow. |
+| Value    | Definition                                             |
+| -------- | ------------------------------------------------------ |
+| `CODE`   | Expression, function, or module-level code pattern.    |
+| `ARCH`   | System structure, service boundaries, data flow.       |
 | `METHOD` | Process or workflow — testing, deployment, sequencing. |
 
 ### `RuleSeverity`
 
 How strictly a `Rule` is enforced.
 
-| Value | Definition |
-| --- | --- |
-| `MUST` | Block on violation; never generate the counter-example. |
-| `SHOULD` | Flag with justification; avoid in generation. |
-| `CONSIDER` | Raise only when asked; prefer but do not enforce. |
+| Value      | Definition                                              |
+| ---------- | ------------------------------------------------------- |
+| `MUST`     | Block on violation; never generate the counter-example. |
+| `SHOULD`   | Flag with justification; avoid in generation.           |
+| `CONSIDER` | Raise only when asked; prefer but do not enforce.       |
 
 ## Entities
 
@@ -69,10 +69,10 @@ A deterministic verification operation applied to a `Skill` or model output. It 
 
 **Attributes**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `op` | CheckOp |  |
-| `arg` | string |  |
+| Name  | Type    | Description |
+| ----- | ------- | ----------- |
+| `op`  | CheckOp |             |
+| `arg` | string  |             |
 
 **Actions:** `run`
 
@@ -91,11 +91,11 @@ A static `Diagnostic` a `Check` produces about a `Skill`: a severity, a category
 
 **Attributes**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `severity` | FindingSeverity |  |
-| `category` | string |  |
-| `message` | string |  |
+| Name       | Type            | Description |
+| ---------- | --------------- | ----------- |
+| `severity` | FindingSeverity |             |
+| `category` | string          |             |
+| `message`  | string          |             |
 
 **Actions**
 
@@ -117,9 +117,9 @@ The verification record over a set of `Skills`: each skill's `ContentHash` and w
 
 **Attributes**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `structureVerified` | boolean |  |
+| Name                | Type    | Description |
+| ------------------- | ------- | ----------- |
+| `structureVerified` | boolean |             |
 
 **Actions**
 
@@ -140,9 +140,9 @@ A generated instruction that tells a model to distil one `Source` into a `Rulese
 
 **Attributes**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `target` | string |  |
+| Name     | Type   | Description |
+| -------- | ------ | ----------- |
+| `target` | string |             |
 
 **Actions:** `generate`
 
@@ -156,9 +156,9 @@ A content-addressed manifest of artifacts that must exist and match their `Conte
 
 **Attributes**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `hashAlgorithm` | string |  |
+| Name            | Type    | Description                                              |
+| --------------- | ------- | -------------------------------------------------------- |
+| `hashAlgorithm` | string  |                                                          |
 | `artifactCount` | integer | _Derived:_ The number of artifacts the `Proof` declares. |
 
 **Actions**
@@ -176,11 +176,11 @@ One atomic, mechanically applicable constraint: an imperative, a rationale namin
 
 **Attributes**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `severity` | RuleSeverity |  |
-| `level` | RuleLevel |  |
-| `section` | string |  |
+| Name       | Type         | Description |
+| ---------- | ------------ | ----------- |
+| `severity` | RuleSeverity |             |
+| `level`    | RuleLevel    |             |
+| `section`  | string       |             |
 
 **Actions:** `create`
 
@@ -200,9 +200,9 @@ A distilled set of executable `Rules` derived from a single `Source`. Loaded as 
 
 **Attributes**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `scope` | string |  |
+| Name    | Type   | Description |
+| ------- | ------ | ----------- |
+| `scope` | string |             |
 
 **Actions**
 
@@ -223,11 +223,11 @@ A SKILL.md artifact: `Frontmatter` plus a Markdown body, authored to be installa
 
 **Attributes**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `name` | string |  |
-| `bytes` | integer |  |
-| `contentHash` | string |  |
+| Name          | Type    | Description |
+| ------------- | ------- | ----------- |
+| `name`        | string  |             |
+| `bytes`       | integer |             |
+| `contentHash` | string  |             |
 
 **Actions**
 
@@ -246,9 +246,9 @@ A prose document of domain expertise — a blog post, article, or paper — that
 
 **Attributes**
 
-| Name | Type | Description |
-| --- | --- | --- |
-| `title` | string |  |
+| Name    | Type   | Description |
+| ------- | ------ | ----------- |
+| `title` | string |             |
 
 **Actions**
 
@@ -289,7 +289,7 @@ erDiagram
 
 ## Scenarios
 
-### Distill a source into a ruleset
+### Distill a Source into a Ruleset
 
 An `Author` turns prose expertise into executable constraints: a `Prompt` is generated for the `Source`, a model distils it into a `Ruleset`, and each `Rule` gets a severity and level.
 
@@ -307,7 +307,7 @@ An `Author` turns prose expertise into executable constraints: a `Prompt` is gen
 - **ruleset-derives-from-one-source** — A `Ruleset` derives from exactly one `Source`.
 - **rule-has-severity-and-level** — Every `Rule` carries a severity and a level.
 
-### Verify a skill tree
+### Verify a Skill Tree
 
 A `Reviewer` runs each `Check` over every `Skill`, first scanning for `RedLight` wording; the `Findings` are recorded in a `Manifest` that is marked verified only if nothing blocking remains.
 
@@ -325,7 +325,7 @@ A `Reviewer` runs each `Check` over every `Skill`, first scanning for `RedLight`
 - **finding-is-a-diagnostic** — A `Finding` is a static `Diagnostic`, never an adjudication `Hypothesis`.
 - **manifest-verified-iff-all-gates-pass** — A `Manifest` is marked verified only when every recorded `Skill` passes its gates.
 
-### Prove and close
+### Prove and Close
 
 Before a `Manifest` closes, a `Proof` is created over the declared artifacts and each is re-hashed to its `ContentHash`; any mismatch blocks the close.
 
@@ -341,4 +341,3 @@ Before a `Manifest` closes, a `Proof` is created over the declared artifacts and
 
 - **proof-artifacts-hash-match** — Every artifact a `Proof` declares exists and matches its recorded `ContentHash`.
 - **manifest-verified-iff-all-gates-pass** — A `Manifest` is marked verified only when every recorded `Skill` passes its gates.
-
