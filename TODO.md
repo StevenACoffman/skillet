@@ -125,11 +125,16 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       call passes `"exegesis"`; `skill.Hash(s.Raw)` → `s.Hash()`. `lint.Finding` kept (finding→skillet
       deferred: exegesis-only lint output, JSON-identical to `finding.Diagnostic` for Error-only findings).
       `replace => ../../git/skillet`. Build/vet/test/golangci all green.
+      **Update 2026-08-03:** on `skillet v0.1.0` (replace dropped). lint delegates
+      frontmatter to `skillet/speclint` and migrated off local `lint.Finding` onto
+      `finding.Diagnostic` — the deferred finding→skillet is now done.
 - [x] skillsaw → deleted `internal/{skill,markdown,neutrality,testprompts,judge,stats,gate,activation,store}`;
       repointed to `skillet/{skill,markdown,neutrality,testprompts,judge,stats,ratchet,auditlog,identity}`;
       kept `internal/{rubric,edit}`. Added `cmd/root.SplitRoots` (CSV `--roots` → skillet's slice API).
       Wired via `replace => ../../git/skillet` (skillet unpublished). Build/vet/`-race`/golangci all green;
       goccy/goldmark now indirect (still offloaded via skillet). `skill.Hash` func → `identity.Hash`.
+      **Update 2026-08-03:** on `skillet v0.1.0` (replace dropped); rubric's description
+      cap comes from `skillet/speclint.DescriptionMaxRunes`.
 - [x] adh → **errs adopted via alias** (`internal/adh/error.go`: `type Error = errs.Error` + re-exported
       codes/funcs) so all 54 `adh.*` call sites keep compiling and `proof` (returns `errs.Error`) stays
       compatible. Deleted `internal/{identity,atomicfile,proof}`; repointed to `skillet/{identity,atomicfile,proof}`.
@@ -150,11 +155,12 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
 
 ## Release / Distribution
 
-- [ ] Publish and tag a real version. Every consumer (exegesis, skillsaw, adh, distill)
-      currently requires `skillet v0.0.0` behind a local `replace => ../../git/skillet`;
-      until skillet is tagged and pushed, none can drop the `replace` or pin a version.
-      Tagging (e.g. `v0.1.0`) is the blocker for turning skillet into a real shared
-      dependency. (survey 2026-08-02)
+- [ ] Bump every consumer off the local `replace`. skillet is published — **v0.1.0**
+      tagged 2026-08-03. **exegesis** and **skillsaw** now require `skillet v0.1.0` and
+      dropped `replace => ../../git/skillet` (PRs merged 2026-08-03). **Remaining: adh
+      and distill** still pin `skillet v0.0.0` behind a local `replace`; bump them to
+      v0.1.0 and drop the replace to finish turning skillet into a real shared
+      dependency. (survey 2026-08-02; updated 2026-08-03)
 
 ## Domain Model
 
