@@ -155,12 +155,12 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
 
 ## Release / Distribution
 
-- [ ] Bump every consumer off the local `replace`. skillet is published — **v0.1.0**
-      tagged 2026-08-03. **exegesis** and **skillsaw** now require `skillet v0.1.0` and
-      dropped `replace => ../../git/skillet` (PRs merged 2026-08-03). **Remaining: adh
-      and distill** still pin `skillet v0.0.0` behind a local `replace`; bump them to
-      v0.1.0 and drop the replace to finish turning skillet into a real shared
-      dependency. (survey 2026-08-02; updated 2026-08-03)
+- [x] Bump every consumer off the local `replace`. skillet is published (**v0.1.0**,
+      tagged 2026-08-03) and all four consumers now require it: **exegesis** and
+      **skillsaw** dropped the replace and pin v0.1.0 (PRs merged 2026-08-03);
+      **distill** dropped it (committed to knowledge-base `kb`); **adh** dropped it on
+      `feat/survey-tier1` (in open PR #2 — lands when that merges). skillet is now a
+      real, versioned shared dependency. (survey 2026-08-02; done 2026-08-03)
 
 ## Domain Model
 
