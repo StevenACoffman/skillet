@@ -100,6 +100,7 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
 - [x] `finding` — `Diagnostic{Severity,Category,Path,Message}`; `Result`; deterministic `Sort`.  src: exegesis, modelith-shaped
 - [x] `judge` — `Check{Op,Arg}`, op set + objective answer-scoring, `Score`→`Result{Hard,Soft,Why}`.  src: skillsaw⊃exegesis
 - [x] `testprompts` — `File`/`Case`/`Parse`(3 shapes)/`Write`/`Validate`/`Scaffold`/`DeriveChecks`/`Behavioral`/`Decoys`/`Find`/`ChecksFor`.  src: exegesis, skillsaw
+- [x] `speclint` — agentskills.io frontmatter spec: `DescriptionMaxRunes`, `AllowedFrontmatterKey`, `Frontmatter(s)→[]finding.Diagnostic`. Single source of truth so exegesis (gates the findings) and skillsaw (scores the cap) can't drift by hand. Name-format policy stays per-tool (exegesis=folder, skillsaw=kebab).  src: exegesis lint + skillsaw rubric (de-duplicated 2026-08-03)
 
 ### Experiment Adjudication (Single-Consumer Today; Shape May Shift When Adh `verdict` Is the 2nd Consumer)
 
@@ -133,11 +134,27 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       codes/funcs) so all 54 `adh.*` call sites keep compiling and `proof` (returns `errs.Error`) stays
       compatible. Deleted `internal/{identity,atomicfile,proof}`; repointed to `skillet/{identity,atomicfile,proof}`.
       `replace => ../skillet`. Build/vet/`-race` (44 pkgs)/golangci all green; x/sys now indirect.
-      **Deferred:** envelope → climax (climax has no `outcome` pkg yet — blocked); `provenance`/`neutrality`
+      **envelope → climax: done** (climax v0.7.0 first shipped the `--jsonl` outcome surface; latest is v0.8.0). adh's
+      generic envelope shell (`Status*`/`Outcome`/`Emit*`) now lives in `cmd/root/outcome.go`
+      matching climax's generated template; adh keeps its words (specialized `CodeForError`,
+      `ReasonForError`, `Reason*` tokens). `// climax:features jsonl` makes `climax lint`
+      drift-check the outcome surface (no drift, verified 2026-08-03). **Note:** climax v0.7.0's
+      lint grew an unrelated base-scaffold check — an unmatched-subcommand guard — that adh has
+      not adopted (a mistyped subcommand falls through `ff.ErrNoExec` and exits 0), so `climax
+      lint` overall reports 1 error. That's adh CLI-scaffolding work, outside skillet's scope.
+      **Still deferred:** `provenance`/`neutrality` → skillet
       (adh has no consumer for either — `internal/skillsaw` is unrelated).
 - [x] distill (ai-skill) → rewrote `main.go` as a thin CLI over `skillet/ruleset/distill.Generate` +
       `skillet/naming` (with the `run()`-returns-int shape). `replace => ../../../git/skillet`. Build + smoke
       (8 prompts, matches original) + golangci all green. Dropped `-dry-run` (skillet's Generate always writes).
+
+## Release / Distribution
+
+- [ ] Publish and tag a real version. Every consumer (exegesis, skillsaw, adh, distill)
+      currently requires `skillet v0.0.0` behind a local `replace => ../../git/skillet`;
+      until skillet is tagged and pushed, none can drop the `replace` or pin a version.
+      Tagging (e.g. `v0.1.0`) is the blocker for turning skillet into a real shared
+      dependency. (survey 2026-08-02)
 
 ## Domain Model
 
