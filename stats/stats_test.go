@@ -37,3 +37,37 @@ func TestWilsonKnownInterval(t *testing.T) {
 		t.Errorf("Wilson(1,2) = [%v,%v]; midpoint should be near 0.5", lo, hi)
 	}
 }
+
+func TestMcNemarSignificance(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name                string
+		improved, regressed int
+		wantSig             bool
+	}{
+		{"no discordant pairs", 0, 0, false},
+		{"three discordant pairs below the critical value", 2, 1, false},
+		{"twelve one-directional flips is significant", 12, 0, true},
+		{"balanced flips are never significant", 20, 20, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			if _, sig := stats.McNemar(c.improved, c.regressed); sig != c.wantSig {
+				t.Errorf("McNemar(%d,%d) significant = %v, want %v",
+					c.improved, c.regressed, sig, c.wantSig)
+			}
+		})
+	}
+}
+
+func TestMcNemarStatistic(t *testing.T) {
+	t.Parallel()
+	// No discordant pairs → zero statistic. 12 vs 0: corrected (|12-0|-1)^2/12 = 121/12.
+	if stat, _ := stats.McNemar(0, 0); stat != 0 {
+		t.Errorf("McNemar(0,0) stat = %v, want 0", stat)
+	}
+	if stat, _ := stats.McNemar(12, 0); math.Abs(stat-121.0/12.0) > 1e-9 {
+		t.Errorf("McNemar(12,0) stat = %v, want %v", stat, 121.0/12.0)
+	}
+}
