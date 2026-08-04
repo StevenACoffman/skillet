@@ -69,8 +69,15 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
 - **`ruleset` is greenfield** — real distilled files are free-form (`## N.` + `**Do**`/`**Do not**`),
   so `Parse` handles the *canonical* `§N.M [SEV][LEVEL]` form `Render` emits (round-trip), not every
   hand-authored file.
-- **`stats`/`ratchet`/`auditlog` have one consumer (skillsaw) today** — extracted faithfully as
-  working code; their shape may shift when adh's `verdict` becomes the 2nd consumer.
+- **`stats` and `ratchet` gain a 2nd consumer: adh's `verdict` (2026-08-04).** skillet side (this
+  PR): `stats` gains `McNemar` beside `Wilson`. adh side (implemented, lands with the bump below):
+  adh's verdict consumes `stats.McNemar`, and adh deleted its duplicate `internal/gate` to adopt
+  `ratchet` (its `Result` gained the superset `Status`/`Delta` fields — additive, no consumer broke).
+  `auditlog` stays single-consumer: adh keeps no results.tsv log, so it has no auditlog consumer
+  (not applicable, like the deferred provenance/neutrality). adh's `Decide`/`Replicate`/`Verdict`
+  taxonomy stayed in adh — domain-specific, one consumer. **Landing order:** merge this, cut
+  **v0.2.0** (`ratchet` already shipped in v0.1.0; `stats.McNemar` is new), then bump adh to v0.2.0
+  and drop its temporary local `replace`.
 
 ## Package Backlog (Dependency Order)
 
@@ -102,11 +109,11 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
 - [x] `testprompts` — `File`/`Case`/`Parse`(3 shapes)/`Write`/`Validate`/`Scaffold`/`DeriveChecks`/`Behavioral`/`Decoys`/`Find`/`ChecksFor`.  src: exegesis, skillsaw
 - [x] `speclint` — agentskills.io frontmatter spec: `DescriptionMaxRunes`, `AllowedFrontmatterKey`, `Frontmatter(s)→[]finding.Diagnostic`. Single source of truth so exegesis (gates the findings) and skillsaw (scores the cap) can't drift by hand. Name-format policy stays per-tool (exegesis=folder, skillsaw=kebab).  src: exegesis lint + skillsaw rubric (de-duplicated 2026-08-03)
 
-### Experiment Adjudication (Single-Consumer Today; Shape May Shift When Adh `verdict` Is the 2nd Consumer)
+### Experiment Adjudication (2nd Consumer: adh `verdict`, 2026-08-04)
 
-- [x] `stats` — `Wilson(k,n)`.                                     src: skillsaw (adh `verdict` adjacent)
-- [x] `ratchet` — `Evaluate`/`SelectScore` gate + activation `Score` confusion matrix (one package, 2 files).  src: skillsaw
-- [x] `auditlog` — `Row` + `Read`/`Append` (results.tsv).          src: skillsaw
+- [x] `stats` — `Wilson(k,n)` + `McNemar(improved,regressed)`.     src: skillsaw (Wilson), adh verdict (McNemar)
+- [x] `ratchet` — `Evaluate`/`SelectScore` gate + activation `Score` confusion matrix (one package, 2 files).  src: skillsaw; adh adopted it (deleted its duplicate internal/gate)
+- [x] `auditlog` — `Row` + `Read`/`Append` (results.tsv).          src: skillsaw (single consumer — adh has no audit log)
 
 ### Rules / Distillation
 
