@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-#
-# skillet is a Go *library*: there are no binaries to build. This release
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+# This is a Go *library*: there are no binaries to build. This release
 # publishes a reproducible source tarball, an SBOM of the module dependency
 # graph (generated with syft), a checksum file that covers every artifact — the
 # SBOM included — and a keyless cosign signature over that checksum.
@@ -18,7 +18,7 @@ before:
   hooks:
     - go mod tidy
 
-# No binaries: skillet exposes only importable packages, so skip the build.
+# No binaries: library exposes only importable packages, so skip the build.
 builds:
   - skip: true
 
@@ -72,14 +72,14 @@ release:
     cosign verify-blob \
       --bundle checksums.txt.sigstore.json \
       --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-      --certificate-identity 'https://github.com/StevenACoffman/skillet/.github/workflows/release.yml@refs/tags/{{ .Tag }}' \
+      --certificate-identity 'https://github.com/StevenACoffman/{{ .ProjectName }}/.github/workflows/release.yml@refs/tags/{{ .Tag }}' \
       checksums.txt
 
     # 2. source tarball + SBOM hash to the now-trusted checksums.
     shasum -a 256 -c checksums.txt
 
     # 3. GitHub build provenance.
-    gh attestation verify {{ .ProjectName }}_{{ .Version }}_source.tar.gz --repo StevenACoffman/skillet
+    gh attestation verify {{ .ProjectName }}_{{ .Version }}_source.tar.gz --repo StevenACoffman/{{ .ProjectName }}
     ```
 
     The SBOM is `{{ .ProjectName }}_{{ .Version }}_source.tar.gz.sbom.json` (SPDX-2.3).
