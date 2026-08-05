@@ -1,14 +1,23 @@
-// Package errs is skillet's shared error type: one Error with machine-readable
-// codes, following Ben Johnson's leaf/wrapper convention. A leaf error carries a
-// Code and Message; a wrapping error carries an Op and a nested Err. The two
-// forms are never mixed on one value: leaves classify, wrappers build a
-// single-line logical stack trace. Call ErrorCode/ErrorMessage at a call site
-// instead of type-asserting *Error.
+// Package errs is skillet's shared error vocabulary: one Error type with
+// machine-readable codes, following Ben Johnson's leaf/wrapper convention. A leaf
+// error carries a Code and Message; a wrapping error carries an Op and a nested
+// Err. The two forms are never mixed on one value: leaves classify, wrappers
+// build a single-line logical stack trace. Call ErrorCode/ErrorMessage at a call
+// site instead of type-asserting *Error.
+//
+// errs is also the bridge to toerr: ErrorCode/ErrorMessage read an *Error and a
+// toerr-coded error (github.com/StevenACoffman/toerr/errors/errcode) alike, so an
+// error classified either way reads back as the same code. The division across
+// skillet is deliberate — toerr owns wrapping and tracing; errs owns the leaf
+// classification and the code vocabulary. Error stays a plain struct because a
+// consumer (adh) composes it directly.
 package errs
 
 import (
 	"errors"
 	"strings"
+
+	"github.com/StevenACoffman/toerr/errors/errcode"
 )
 
 // Error codes are machine-readable classifications set on leaf errors. Start
@@ -77,6 +86,9 @@ func ErrorCode(err error) string {
 			return ErrorCode(e.Err)
 		}
 	}
+	if status := errcode.Status(err); status != errcode.StatusUnknown {
+		return codeFromStatus(status)
+	}
 	return EINTERNAL
 }
 
@@ -96,5 +108,27 @@ func ErrorMessage(err error) string {
 			return ErrorMessage(e.Err)
 		}
 	}
+	if msg := errcode.Message(err); msg != "" {
+		return msg
+	}
 	return "an internal error occurred"
+}
+
+// codeFromStatus maps a toerr errcode.StatusCode onto skillet's string code
+// vocabulary, so an error coded via toerr reads back through ErrorCode as the same
+// classification an *Error leaf would carry. Codes with no skillet analogue fall to
+// EINTERNAL (default-signifies-exhaustive).
+func codeFromStatus(code errcode.StatusCode) string {
+	switch code {
+	case errcode.StatusInvalidArgument:
+		return EINVALID
+	case errcode.StatusAlreadyExists, errcode.StatusFailedPrecondition:
+		return ECONFLICT
+	case errcode.StatusNotFound:
+		return ENOTFOUND
+	case errcode.StatusUnauthenticated, errcode.StatusPermissionDenied:
+		return EUNAUTHORIZED
+	default:
+		return EINTERNAL
+	}
 }
