@@ -7,6 +7,7 @@
 package skill
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 
+	"github.com/StevenACoffman/skillet/errs"
 	"github.com/StevenACoffman/skillet/fsutil"
 	"github.com/StevenACoffman/skillet/identity"
 )
@@ -35,13 +37,18 @@ type Skill struct {
 	Bytes           int      // byte size of Raw
 }
 
-// Load reads and parses <dir>/SKILL.md. The error wraps os.ErrNotExist when the
-// file is absent, so callers can errors.Is it.
+// Load reads and parses <dir>/SKILL.md. A missing SKILL.md is translated at this
+// boundary to an errs.Error with code ENOTFOUND (classify it via errs.ErrorCode);
+// the external os.ErrNotExist is not propagated. Any other read error is wrapped
+// with Op "skill.Load".
 func Load(dir string) (*Skill, error) {
 	p := filepath.Join(dir, FileName)
 	b, err := os.ReadFile(p)
 	if err != nil {
-		return nil, fmt.Errorf("load skill %s: %w", dir, err)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, &errs.Error{Code: errs.ENOTFOUND, Message: "skill not found: " + p}
+		}
+		return nil, &errs.Error{Op: "skill.Load", Err: err}
 	}
 	s := &Skill{Dir: dir, Path: p, Raw: string(b), Bytes: len(b)}
 	s.parse()
