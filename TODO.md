@@ -208,9 +208,12 @@ not yet tracked elsewhere.
   (skillsaw#3); **canonizer** was already current. Every bump was inert — go.mod/go.sum only,
   suites green, `golangci-lint` clean — confirming the extractions across v0.1.0–v0.5.0 were
   genuinely additive. Once the three PRs merge, all four consumers share one kernel again.
-- [ ] **Revisit single-consumer extractions.** `auditlog` (skillsaw only) and `provenance` (no
-  confirmed 2nd consumer — adh does not import it) remain speculative; fine to keep, but flag them
-  as not-yet-shared rather than proven shared kernel.
+- [x] **Revisit single-consumer extractions.** DONE (2026-08-05): verified by grep across the whole
+  family — `auditlog` has exactly one consumer (skillsaw's `cmd/history`), and `provenance` has
+  **zero** (an unused speculative extraction generalized from modelith). Both are now flagged
+  **provisional** in their package docs (discoverable via `go doc`), and kept — not deleted. Exit
+  criteria recorded there: `auditlog` earns the "shared" designation on a 2nd consumer; `provenance`
+  should be deleted if it is still unused at the next survey rather than carry unused public surface.
 
 ## Domain Model
 
