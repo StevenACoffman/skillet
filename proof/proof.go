@@ -12,6 +12,7 @@ import (
 	"github.com/StevenACoffman/skillet/atomicfile"
 	"github.com/StevenACoffman/skillet/errs"
 	"github.com/StevenACoffman/skillet/identity"
+	errors "github.com/StevenACoffman/toerr/errors"
 )
 
 // Artifact is one declared piece of proof: a repository-relative path and the
@@ -54,7 +55,7 @@ func Create(root, arc, gitSHA string, paths []string) (Packet, error) {
 	for _, path := range paths {
 		data, err := os.ReadFile(filepath.Join(root, path))
 		if err != nil {
-			return Packet{}, &errs.Error{Op: op, Err: err}
+			return Packet{}, errors.WrapWithMessage(err, op)
 		}
 		artifacts = append(artifacts, Artifact{Path: path, Digest: identity.Hash(string(data))})
 	}
@@ -71,13 +72,13 @@ func Save(path string, pkt *Packet) error {
 	const op = "proof.Save"
 	data, err := json.MarshalIndent(pkt, "", "  ")
 	if err != nil {
-		return &errs.Error{Op: op, Err: err}
+		return errors.WrapWithMessage(err, op)
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		return &errs.Error{Op: op, Err: err}
+		return errors.WrapWithMessage(err, op)
 	}
 	if err := atomicfile.WriteFile(path, append(data, '\n'), 0o600); err != nil {
-		return &errs.Error{Op: op, Err: err}
+		return errors.WrapWithMessage(err, op)
 	}
 	return nil
 }
@@ -87,11 +88,11 @@ func Load(path string) (Packet, error) {
 	const op = "proof.Load"
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Packet{}, &errs.Error{Op: op, Err: err}
+		return Packet{}, errors.WrapWithMessage(err, op)
 	}
 	var pkt Packet
 	if err := json.Unmarshal(data, &pkt); err != nil {
-		return Packet{}, &errs.Error{Op: op, Err: err}
+		return Packet{}, errors.WrapWithMessage(err, op)
 	}
 	return pkt, nil
 }
@@ -115,7 +116,7 @@ func Verify(root string, pkt *Packet) error {
 				Message: "missing proof artifact: " + artifact.Path,
 			}
 		case err != nil:
-			return &errs.Error{Op: op, Err: err}
+			return errors.WrapWithMessage(err, op)
 		}
 		if got := identity.Hash(string(data)); got != artifact.Digest {
 			return &errs.Error{
