@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/StevenACoffman/skillet/errs"
+	"github.com/StevenACoffman/toerr/errors/errcode"
 )
 
 func TestErrorString(t *testing.T) {
@@ -86,5 +87,36 @@ func TestErrorUnwrapTraverses(t *testing.T) {
 	wrapped := fmt.Errorf("ctx: %w", &errs.Error{Code: errs.EUNAUTHORIZED})
 	if got := errs.ErrorCode(wrapped); got != errs.EUNAUTHORIZED {
 		t.Fatalf("ErrorCode through fmt.Errorf = %q, want %q", got, errs.EUNAUTHORIZED)
+	}
+}
+
+// TestBridgeReadsToerrCodes covers the toerr bridge: an error coded via toerr's
+// errcode reads back through ErrorCode as the same string classification an *Error
+// leaf would carry, so the two representations share one vocabulary.
+func TestBridgeReadsToerrCodes(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name   string
+		status errcode.StatusCode
+		want   string
+	}{
+		{"invalid", errcode.StatusInvalidArgument, errs.EINVALID},
+		{"conflict", errcode.StatusFailedPrecondition, errs.ECONFLICT},
+		{"already-exists is a conflict", errcode.StatusAlreadyExists, errs.ECONFLICT},
+		{"not-found", errcode.StatusNotFound, errs.ENOTFOUND},
+		{"permission is unauthorized", errcode.StatusPermissionDenied, errs.EUNAUTHORIZED},
+		{"no analogue falls to internal", errcode.StatusUnimplemented, errs.EINTERNAL},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := errcode.WithCode(tc.status, "boundary message", nil)
+			if got := errs.ErrorCode(err); got != tc.want {
+				t.Errorf("ErrorCode(%s) = %q, want %q", tc.status, got, tc.want)
+			}
+			if got := errs.ErrorMessage(err); got != "boundary message" {
+				t.Errorf("ErrorMessage(%s) = %q, want %q", tc.status, got, "boundary message")
+			}
+		})
 	}
 }
