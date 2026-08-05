@@ -192,10 +192,13 @@ not yet tracked elsewhere.
   next bump.
 - [ ] **`skill.Load` → `ENOTFOUND` mapping** (the standing refinement noted in Design Decisions):
   map `os.ErrNotExist` onto the typed `ENOTFOUND` code rather than a bare `fmt.Errorf`+`%w`.
-- [ ] **Consumer version skew.** The point of skillet is byte-identical answers across tools, yet
-  consumers span v0.1.0–v0.5.0. skillsaw (v0.1.0) and exegesis (v0.4.0) share
-  `speclint`/`judge`/`testprompts` across four versions — the drift skillet exists to prevent.
-  Coordinate a bump train to v0.5.0.
+- [x] **Consumer version skew — bump train run (2026-08-05).** The point of skillet is
+  byte-identical answers across tools, yet consumers had spanned v0.1.0–v0.5.0. Each lagging
+  consumer was bumped to v0.5.0 on its own branch (PRs open): **adh** v0.3.0→v0.5.0
+  (agentic-dev-harness#5), **exegesis** v0.4.0→v0.5.0 (exegesis#9), **skillsaw** v0.1.0→v0.5.0
+  (skillsaw#3); **canonizer** was already current. Every bump was inert — go.mod/go.sum only,
+  suites green, `golangci-lint` clean — confirming the extractions across v0.1.0–v0.5.0 were
+  genuinely additive. Once the three PRs merge, all four consumers share one kernel again.
 - [ ] **Revisit single-consumer extractions.** `auditlog` (skillsaw only) and `provenance` (no
   confirmed 2nd consumer — adh does not import it) remain speculative; fine to keep, but flag them
   as not-yet-shared rather than proven shared kernel.
