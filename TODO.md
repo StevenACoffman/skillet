@@ -184,12 +184,18 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
 The checklist above is complete; these are surfaced by a survey of the consumer repos and are
 not yet tracked elsewhere.
 
-- [ ] **Resolve the `errs` vs `toerr` split.** skillet ships its own `errs` (Ben Johnson `Error`,
-  used by `proof` and the kernel) *and* now depends on `toerr` v0.1.0 — but toerr is used in exactly
-  one file (`ruleset/synthesize`). Decide whether `errs` migrates onto (or becomes a thin alias over)
-  `toerr` repo-wide, or the two coexist by design, and document it. adh re-exports `errs.Error` as
-  `adh.Error`, so making `errs` a toerr shim would propagate the consolidation to adh for free on its
-  next bump.
+- [x] **Resolve the `errs` vs `toerr` split.** DONE (2026-08-05): consolidated on a clear division —
+  **toerr owns wrapping/tracing; errs owns leaf classification and the shared code vocabulary.**
+  `proof`'s 7 wrappers moved to `toerr.WrapWithMessage` (joining `ruleset/synthesize`), so skillet now
+  wraps uniformly through toerr and gains a `%+v` trace frame; its 4 leaf classifications stay
+  `errs.Error{Code,Message}`. `errs` became toerr-aware — `ErrorCode`/`ErrorMessage` read a toerr
+  `errcode` error and an `*errs.Error` alike (one `codeFromStatus` map), so both representations
+  classify identically. A *full* removal of `errs.Error` is intentionally deferred: adh composes it as
+  a struct (`&adh.Error{Op,Err}`, 157 sites) and toerr exposes no composable struct, so `errs.Error` is
+  retained as adh's compat type. `errs` now imports toerr directly, so adh gains toerr indirect on its
+  next bump — setting up an eventual adh migration off struct-literal `Error` (the remaining follow-up).
+  - [ ] Follow-up (needs an adh-side change + a wrapcheck sig for `errcode.WithCode`): migrate proof's
+    leaf errors to `errcode.WithCode` and adh off `&adh.Error{}` literals, then retire `errs.Error`.
 - [ ] **`skill.Load` → `ENOTFOUND` mapping** (the standing refinement noted in Design Decisions):
   map `os.ErrNotExist` onto the typed `ENOTFOUND` code rather than a bare `fmt.Errorf`+`%w`.
 - [x] **Consumer version skew — bump train run (2026-08-05).** The point of skillet is
