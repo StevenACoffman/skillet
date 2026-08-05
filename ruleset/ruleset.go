@@ -1,8 +1,8 @@
 // Package ruleset is the typed model of a distilled ruleset: a set of Rules,
-// each an imperative with a severity, a level, a rationale, and a ✗/✓ example
-// pair. Render emits the canonical text form and Parse reads it back; the two
-// round-trip. Parse handles the canonical form Render emits, not every hand-
-// authored variation a distilled Markdown file may contain.
+// each an imperative with a severity, a level, a rationale, a ✗/✓ example pair,
+// and an optional ↦ source anchor. Render emits the canonical text form and Parse
+// reads it back; the two round-trip. Parse handles the canonical form Render
+// emits, not every hand-authored variation a distilled Markdown file may contain.
 package ruleset
 
 import (
@@ -39,13 +39,14 @@ type Level string
 
 // Rule is one atomic, mechanically applicable constraint.
 type Rule struct {
-	Section   string
-	Severity  Severity
-	Level     Level
-	Statement string
-	Rationale string
-	Bad       string // the ✗ counter-example
-	Good      string // the ✓ preferred form
+	Section      string
+	Severity     Severity
+	Level        Level
+	Statement    string
+	Rationale    string
+	Bad          string // the ✗ counter-example
+	Good         string // the ✓ preferred form
+	SourceAnchor string // the ↦ source quote or section this rule derives from
 }
 
 // Ruleset is a distilled set of Rules derived from one source.
@@ -93,6 +94,9 @@ func Render(rs Ruleset) string {
 		}
 		if r.Good != "" {
 			fmt.Fprintf(&b, "%s✓  %s\n", indent, r.Good)
+		}
+		if r.SourceAnchor != "" {
+			fmt.Fprintf(&b, "%s↦  %s\n", indent, r.SourceAnchor)
 		}
 	}
 	return b.String()
@@ -154,6 +158,8 @@ func applyBody(r *Rule, trimmed string) {
 		r.Bad = strings.TrimSpace(strings.TrimPrefix(trimmed, "✗"))
 	case strings.HasPrefix(trimmed, "✓"):
 		r.Good = strings.TrimSpace(strings.TrimPrefix(trimmed, "✓"))
+	case strings.HasPrefix(trimmed, "↦"):
+		r.SourceAnchor = strings.TrimSpace(strings.TrimPrefix(trimmed, "↦"))
 	case r.Rationale == "":
 		r.Rationale = trimmed
 	default:

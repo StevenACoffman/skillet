@@ -24,13 +24,14 @@ func TestRenderParseRoundTrip(t *testing.T) {
 		Scope:  "Go application structure",
 		Rules: []ruleset.Rule{
 			{
-				Section:   "2.3",
-				Severity:  ruleset.MUST,
-				Level:     ruleset.CODE,
-				Statement: "Never discard an error return without an explicit decision.",
-				Rationale: "Silently dropping errors removes the caller's only failure signal.",
-				Bad:       "result, _ = db.Exec(query)",
-				Good:      "result, err = db.Exec(query); if err != nil { return err }",
+				Section:      "2.3",
+				Severity:     ruleset.MUST,
+				Level:        ruleset.CODE,
+				Statement:    "Never discard an error return without an explicit decision.",
+				Rationale:    "Silently dropping errors removes the caller's only failure signal.",
+				Bad:          "result, _ = db.Exec(query)",
+				Good:         "result, err = db.Exec(query); if err != nil { return err }",
+				SourceAnchor: `§Errors: "never ignore the value returned by a function"`,
 			},
 			{
 				Section:   "3.1",
