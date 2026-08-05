@@ -3,6 +3,10 @@
 // the content digest that header records. The digest is defined over the file
 // with its provenance header stripped, so stamping a header does not change the
 // digest it records. Adapted, generalized, from modelith's provenance package.
+//
+// Status: provisional. No package across the family imports it yet — a speculative
+// extraction awaiting its first use. Kept as a ready, tested unit; delete it if it
+// stays unused rather than let unused surface accrete. See skillet's TODO.
 package provenance
 
 import (

@@ -2,6 +2,10 @@
 // baseline/keep/revert/error row per experiment, nine tab-separated columns.
 // Read and Fields are pure (over an io.Reader / a value); the file open/append
 // lives in the command shell.
+//
+// Status: provisional shared kernel. One consumer imports it today — skillsaw's
+// history command — so it has not yet earned the "shared" designation a second
+// consumer would confirm. Kept as a clean, tested unit; see skillet's TODO.
 package auditlog
 
 import (
