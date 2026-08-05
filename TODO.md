@@ -78,6 +78,10 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
   taxonomy stayed in adh — domain-specific, one consumer. **Landing order:** merge this, cut
   **v0.2.0** (`ratchet` already shipped in v0.1.0; `stats.McNemar` is new), then bump adh to v0.2.0
   and drop its temporary local `replace`.
+  **Update (2026-08-05):** shipped well past this note — **v0.2.0** (`stats.McNemar`), **v0.3.0**,
+  **v0.4.0** (`ruleset/synthesize`), and **v0.5.0** (`ruleset.SourceAnchor` + `toerr.WrapWithMessage`
+  registered with `wrapcheck`) are all tagged. adh adopted **v0.3.0** and dropped its `replace`;
+  consumers now span v0.1.0–v0.5.0 (see the version-skew item under Open Threads below).
 
 ## Package Backlog (Dependency Order)
 
@@ -169,6 +173,32 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       **distill** dropped it (committed to knowledge-base `kb`); **adh** dropped it on
       `feat/survey-tier1` (in open PR #2 — lands when that merges). skillet is now a
       real, versioned shared dependency. (survey 2026-08-02; done 2026-08-03)
+- [x] Cut the post-v0.1.0 releases (2026-08-04/05): **v0.2.0** `stats.McNemar`; **v0.3.0**
+      (adh adopted this — `verdict` on `stats.McNemar`, `internal/gate` replaced by `ratchet`);
+      **v0.4.0** `ruleset/synthesize`; **v0.5.0** `ruleset.SourceAnchor` + `toerr.WrapWithMessage`
+      registered with `wrapcheck`. Consumer pins now diverge — **skillsaw** v0.1.0, **adh** v0.3.0,
+      **exegesis** v0.4.0, **canonizer** v0.5.0 — see the version-skew item under Open Threads.
+
+## Open Threads (2026-08-05 cross-repo survey)
+
+The checklist above is complete; these are surfaced by a survey of the consumer repos and are
+not yet tracked elsewhere.
+
+- [ ] **Resolve the `errs` vs `toerr` split.** skillet ships its own `errs` (Ben Johnson `Error`,
+  used by `proof` and the kernel) *and* now depends on `toerr` v0.1.0 — but toerr is used in exactly
+  one file (`ruleset/synthesize`). Decide whether `errs` migrates onto (or becomes a thin alias over)
+  `toerr` repo-wide, or the two coexist by design, and document it. adh re-exports `errs.Error` as
+  `adh.Error`, so making `errs` a toerr shim would propagate the consolidation to adh for free on its
+  next bump.
+- [ ] **`skill.Load` → `ENOTFOUND` mapping** (the standing refinement noted in Design Decisions):
+  map `os.ErrNotExist` onto the typed `ENOTFOUND` code rather than a bare `fmt.Errorf`+`%w`.
+- [ ] **Consumer version skew.** The point of skillet is byte-identical answers across tools, yet
+  consumers span v0.1.0–v0.5.0. skillsaw (v0.1.0) and exegesis (v0.4.0) share
+  `speclint`/`judge`/`testprompts` across four versions — the drift skillet exists to prevent.
+  Coordinate a bump train to v0.5.0.
+- [ ] **Revisit single-consumer extractions.** `auditlog` (skillsaw only) and `provenance` (no
+  confirmed 2nd consumer — adh does not import it) remain speculative; fine to keep, but flag them
+  as not-yet-shared rather than proven shared kernel.
 
 ## Domain Model
 
