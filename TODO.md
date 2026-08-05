@@ -196,8 +196,11 @@ not yet tracked elsewhere.
   next bump — setting up an eventual adh migration off struct-literal `Error` (the remaining follow-up).
   - [ ] Follow-up (needs an adh-side change + a wrapcheck sig for `errcode.WithCode`): migrate proof's
     leaf errors to `errcode.WithCode` and adh off `&adh.Error{}` literals, then retire `errs.Error`.
-- [ ] **`skill.Load` → `ENOTFOUND` mapping** (the standing refinement noted in Design Decisions):
-  map `os.ErrNotExist` onto the typed `ENOTFOUND` code rather than a bare `fmt.Errorf`+`%w`.
+- [x] **`skill.Load` → `ENOTFOUND` mapping** DONE (2026-08-05): a missing SKILL.md is translated
+  at the boundary to a leaf `errs.Error{Code: ENOTFOUND}` (classify via `errs.ErrorCode`); any other
+  read error wraps with `Op: "skill.Load"`. `os.ErrNotExist` is no longer propagated (verified no
+  consumer relied on `errors.Is` — exegesis/skillsaw only test `err != nil`), per go-advice §3
+  translate-at-the-boundary; the test now asserts the code + "not found" message.
 - [x] **Consumer version skew — bump train run (2026-08-05).** The point of skillet is
   byte-identical answers across tools, yet consumers had spanned v0.1.0–v0.5.0. Each lagging
   consumer was bumped to v0.5.0 on its own branch (PRs open): **adh** v0.3.0→v0.5.0
@@ -212,3 +215,37 @@ not yet tracked elsewhere.
 ## Domain Model
 
 - [x] `skillet.modelith.yaml` + rendered `.md` capturing the entities/relationships above (authored with modelith; `modelith lint` clean).
+
+## Reasoning-toolkit survey — `skillet/calibration` (unified-thinking, 2026-08-05)
+
+Source: a survey of `~/Documents/git/unified-thinking` (a deterministic Go reasoning
+toolkit) for techniques the family could reuse. Its one clean, well-tested gap-fill is
+**confidence calibration** — the reliability complement to the significance stats `stats`
+already owns.
+
+- [x] **Add `skillet/calibration` — Brier score + ECE + MCE.** DONE (2026-08-05): shipped as
+  package `calibration` (`Compute([]Sample) Report` → ECE/MCE/Brier + per-bin breakdown), pure
+  `math`-only, property-based + example tests. Fixes the reference's divide-by-input-length bug
+  (metrics divide by the in-range samples actually scored) and omits its arbitrary quality-label
+  thresholds. `stats` measures
+  *significance* (Wilson interval, McNemar); nothing in the family measured *reliability* —
+  whether a stated confidence matches the observed outcome rate. Lift the math from
+  unified-thinking's `benchmarks/evaluators/calibration.go` (`ComputeCalibration`: Expected
+  Calibration Error, Max Calibration Error, and Brier score over N confidence buckets, using
+  per-bucket *mean* confidence — the correct variant; their production tracker uses the
+  weaker bucket-midpoint form). Pure value→value, no deps; a natural sibling of `stats`.
+  Consumers: adh (critic/judge/evaluation confidence vs closed-arc outcomes) and skillsaw
+  (rubric/judge scores vs realized quality) — see their TODOs. Give it the same
+  property-based + example test treatment `stats` warrants.
+- [ ] Deferred — a possible `skillet/bandit` (Thompson Sampling: Beta-Bernoulli +
+  Marsaglia-Tsang Gamma sampling, plus entropy/convergence diagnostics) if a 2nd consumer
+  wants principled strategy selection under uncertainty. unified-thinking's
+  `internal/reinforcement` is a clean, seedable, ~90%-covered reference. Only one
+  prospective consumer today (adh strategy / rework-budget), so hold until a 2nd appears —
+  the family's promote-on-2nd-consumer rule.
+- Deliberately NOT adopted: unified-thinking's bias / fallacy / blind-spot / evidence /
+  self-eval detectors are keyword-and-substring heuristics with hand-tuned, uncalibrated
+  constants — the "instruct, don't enforce" shape the family rejects — and its
+  significance handling (a hardcoded `p=0.05` placeholder, no held-out split) is weaker
+  than `stats`. Only the calibration math (and a few isolated algorithms, noted in the
+  consumer TODOs) are worth lifting.
