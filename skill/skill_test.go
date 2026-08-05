@@ -1,13 +1,13 @@
 package skill_test
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/StevenACoffman/skillet/errs"
 	"github.com/StevenACoffman/skillet/identity"
 	"github.com/StevenACoffman/skillet/skill"
 )
@@ -61,8 +61,11 @@ func TestLoadMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("want an error loading a dir with no SKILL.md")
 	}
-	if !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("want os.ErrNotExist in the chain, got %v", err)
+	if code := errs.ErrorCode(err); code != errs.ENOTFOUND {
+		t.Fatalf("want ENOTFOUND code, got %q (%v)", code, err)
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error message = %q, want it to mention \"not found\"", err)
 	}
 }
 
