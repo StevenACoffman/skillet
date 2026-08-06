@@ -114,7 +114,7 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
 - [x] `redlines` — book2skill Quality Red Lines: `MaxQuoteWords`, `Check(s)→[]finding.Diagnostic` (six RIA-TV++ segments, quotation ceiling, description states a trigger). Deliberately **separate from `speclint`**: speclint encodes the agentskills.io spec and moves when the spec moves; the red lines encode book2skill's house rules and move when the methodology moves. Messages moved verbatim from exegesis so its CLI tests pass unchanged.  src: exegesis internal/lint (promoted 2026-08-06); 2nd consumer skillsaw (pending)
 - [x] `speclint` — agentskills.io frontmatter spec: `DescriptionMaxRunes`, `AllowedFrontmatterKey`, `Frontmatter(s)→[]finding.Diagnostic`. Single source of truth so exegesis (gates the findings) and skillsaw (scores the cap) can't drift by hand. Name-format policy stays per-tool (exegesis=folder, skillsaw=kebab).  src: exegesis lint + skillsaw rubric (de-duplicated 2026-08-03)
 
-### Experiment Adjudication (2nd Consumer: adh `verdict`, 2026-08-04)
+### Experiment Adjudication (2Nd Consumer: Adh `verdict`, 2026-08-04)
 
 - [x] `stats` — `Wilson(k,n)` + `McNemar(improved,regressed)`.     src: skillsaw (Wilson), adh verdict (McNemar)
 - [x] `ratchet` — `Evaluate`/`SelectScore` gate + activation `Score` confusion matrix (one package, 2 files).  src: skillsaw; adh adopted it (deleted its duplicate internal/gate)
@@ -180,7 +180,7 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       registered with `wrapcheck`. Consumer pins now diverge — **skillsaw** v0.1.0, **adh** v0.3.0,
       **exegesis** v0.4.0, **canonizer** v0.5.0 — see the version-skew item under Open Threads.
 
-## Open Threads (2026-08-05 cross-repo survey)
+## Open Threads (2026-08-05 Cross-Repo Survey)
 
 The checklist above is complete; these are surfaced by a survey of the consumer repos and are
 not yet tracked elsewhere.
@@ -220,7 +220,7 @@ not yet tracked elsewhere.
 
 - [x] `skillet.modelith.yaml` + rendered `.md` capturing the entities/relationships above (authored with modelith; `modelith lint` clean).
 
-## Reasoning-toolkit survey — `skillet/calibration` (unified-thinking, 2026-08-05)
+## Reasoning-Toolkit Survey — `skillet/calibration` (Unified-Thinking, 2026-08-05)
 
 Source: a survey of `~/Documents/git/unified-thinking` (a deterministic Go reasoning
 toolkit) for techniques the family could reuse. Its one clean, well-tested gap-fill is
