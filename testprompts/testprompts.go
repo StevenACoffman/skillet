@@ -2,16 +2,23 @@
 // contract shared by exegesis and skillsaw. It accepts the canonical
 // {"tests":[...]} shape, a bare top-level array, and the legacy
 // {"test_cases":[...]} shape with "expected_behavior", normalizing all three
-// into one form. A case carries an activation Type and optional judge Checks;
-// ChecksFor bridges to judge, and Validate gates the composition. Parsing and
-// validation are pure; only Load and Write touch the filesystem.
+// into one form, recording in File.Rewrites how the file differed so a caller that
+// writes it back knows it is migrating one. A case carries an activation Type and
+// optional judge Checks; ChecksFor bridges to judge.
+//
+// Validate gates the standard composition; ValidateAgainst takes a Composition, so a
+// caller with its own case vocabulary and minimums gates on those without this package
+// knowing them. Parsing and validation are pure; only Load and Write touch the
+// filesystem.
 package testprompts
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strconv"
 
 	"github.com/StevenACoffman/skillet/judge"
@@ -46,6 +53,19 @@ type Case struct {
 type File struct {
 	Skill string `json:"skill,omitempty"`
 	Tests []Case `json:"tests"`
+
+	// Rewrites lists how the file as read differed from the canonical form Write
+	// emits, one entry per difference, empty when the file was already canonical.
+	//
+	// Parse accepts three container shapes and several per-case legacy spellings but
+	// Write emits only one form, so writing a parsed file back is a silent migration.
+	// A caller that writes needs to know: it must either refuse a non-canonical file
+	// or say plainly that it is converting one. That is not recoverable from the
+	// normalized result, which is why it is recorded here rather than derived.
+	//
+	// It is excluded from JSON: it describes the file that was read, not the document,
+	// and must not appear in what Write emits.
+	Rewrites []string `json:"-"`
 }
 
 // Counts tallies cases by type.
@@ -54,6 +74,20 @@ type Counts struct {
 	Decoy   int
 	Edge    int
 }
+
+// Composition is a required case mix: each accepted case type mapped to the minimum
+// number of cases of that type a set must contain.
+//
+// One value answers both questions a gate asks — "is this case type legal?" (is it a
+// key) and "are there enough of it?" (the value) — which the built-in gate previously
+// held as two separate hard-coded lists that could drift apart. A type mapped to 0 is
+// accepted but not required.
+//
+// Callers with their own vocabulary supply their own Composition rather than skillet
+// carrying their case types: a merged-skill gate, for instance, adds its
+// prefer_merged_over_source category and raises the edge-case floor without this
+// package knowing that merging exists.
+type Composition map[string]int
 
 // rawCase tolerates every accepted on-disk shape: a numeric or string id, and
 // either "expected" or the legacy "expected_behavior".
@@ -88,7 +122,13 @@ func Parse(b []byte) (*File, error) {
 		if err := json.Unmarshal(trimmed, &arr); err != nil {
 			return nil, fmt.Errorf("bare array: %w", err)
 		}
-		return &File{Tests: normalize(arr)}, nil
+		cases, rewrites := normalize(arr)
+		return &File{
+			Tests: cases,
+			Rewrites: append(
+				[]string{`top-level array; canonical is an object with a "tests" key`},
+				rewrites...),
+		}, nil
 	}
 	var obj struct {
 		Skill     string    `json:"skill"`
@@ -98,11 +138,25 @@ func Parse(b []byte) (*File, error) {
 	if err := json.Unmarshal(b, &obj); err != nil {
 		return nil, fmt.Errorf("object: %w", err)
 	}
+	var rewrites []string
 	cases := obj.Tests
-	if len(cases) == 0 {
+	switch {
+	case len(cases) == 0 && len(obj.TestCases) > 0:
 		cases = obj.TestCases
+		rewrites = append(rewrites, `legacy "test_cases" key; canonical is "tests"`)
+	case len(cases) > 0 && len(obj.TestCases) > 0:
+		// Both keys populated: the reader has always preferred "tests" and dropped the
+		// rest, so writing back would delete cases the author can still see on disk.
+		rewrites = append(rewrites, fmt.Sprintf(
+			`both "tests" and "test_cases" are present; the %d "test_cases" entries are dropped`,
+			len(obj.TestCases)))
 	}
-	return &File{Skill: obj.Skill, Tests: normalize(cases)}, nil
+	normalized, caseRewrites := normalize(cases)
+	return &File{
+		Skill:    obj.Skill,
+		Tests:    normalized,
+		Rewrites: append(rewrites, caseRewrites...),
+	}, nil
 }
 
 // Write marshals f to path in canonical, indented form.
@@ -162,32 +216,62 @@ func ChecksFor(c *Case) (checks []judge.Check, derived bool) {
 	return DeriveChecks(c.Expected), true
 }
 
-// Tally returns the per-type case counts.
-func (f *File) Tally() Counts {
-	var c Counts
-	for _, tc := range f.Tests {
-		switch tc.Type {
-		case TypeShouldTrigger:
-			c.Trigger++
-		case TypeShouldNotTrigger:
-			c.Decoy++
-		case TypeEdgeCase:
-			c.Edge++
-		}
+// Standard returns the composition an ordinary skill's test set must meet: a set
+// without decoys and an edge case only ever looks "good", so all three are required.
+//
+// It returns a fresh map on each call rather than exposing a package-level one. A
+// shared map is mutable global state — a caller adding its own case type would silently
+// change the rule for every other caller in the process.
+func Standard() Composition {
+	return Composition{
+		TypeShouldTrigger:    MinTrigger,
+		TypeShouldNotTrigger: MinDecoy,
+		TypeEdgeCase:         MinEdge,
 	}
-	return c
 }
 
-// Validate returns one problem string per composition or per-case defect; an
-// empty slice means the set passes the gate. The result is empty iff every case
-// is well-formed and the counts meet MinTrigger/MinDecoy/MinEdge.
+// CountOf returns how many cases carry the given type.
+func (f *File) CountOf(caseType string) int {
+	n := 0
+	for _, c := range f.Tests {
+		if c.Type == caseType {
+			n++
+		}
+	}
+	return n
+}
+
+// Tally returns the per-type case counts for the three standard types. Sets using a
+// wider vocabulary should ask CountOf, which is not limited to them.
+func (f *File) Tally() Counts {
+	return Counts{
+		Trigger: f.CountOf(TypeShouldTrigger),
+		Decoy:   f.CountOf(TypeShouldNotTrigger),
+		Edge:    f.CountOf(TypeEdgeCase),
+	}
+}
+
+// Validate gates the set against Standard: one problem string per composition or
+// per-case defect, empty when it passes. Use ValidateAgainst to supply a different mix.
 func (f *File) Validate() []string {
+	return f.ValidateAgainst(Standard())
+}
+
+// ValidateAgainst returns one problem string per composition or per-case defect
+// measured against want; an empty slice means the set passes that gate.
+//
+// A case whose type is not a key of want is reported as unknown, so the vocabulary and
+// the minimums cannot disagree — they are the same value. Per-case defects (empty
+// prompt, empty expected, duplicate id) are gate-independent and always checked.
+//
+// Ensures: the problems are deterministically ordered; it is pure and reads nothing
+//
+//	outside f and want.
+func (f *File) ValidateAgainst(want Composition) []string {
 	var problems []string
 	seen := map[int]bool{}
 	for _, tc := range f.Tests {
-		switch tc.Type {
-		case TypeShouldTrigger, TypeShouldNotTrigger, TypeEdgeCase:
-		default:
+		if _, ok := want[tc.Type]; !ok {
 			problems = append(problems, fmt.Sprintf("case %d: unknown type %q", tc.ID, tc.Type))
 		}
 		if tc.Prompt == "" {
@@ -201,21 +285,14 @@ func (f *File) Validate() []string {
 		}
 		seen[tc.ID] = true
 	}
-	c := f.Tally()
-	if c.Trigger < MinTrigger {
-		problems = append(
-			problems,
-			fmt.Sprintf("need >=%d should_trigger, have %d", MinTrigger, c.Trigger),
-		)
-	}
-	if c.Decoy < MinDecoy {
-		problems = append(
-			problems,
-			fmt.Sprintf("need >=%d should_not_trigger, have %d", MinDecoy, c.Decoy),
-		)
-	}
-	if c.Edge < MinEdge {
-		problems = append(problems, fmt.Sprintf("need >=%d edge_case, have %d", MinEdge, c.Edge))
+	// Map iteration is randomized; sort so the same set always reports identically.
+	for _, caseType := range slices.Sorted(maps.Keys(want)) {
+		if n := f.CountOf(caseType); n < want[caseType] {
+			problems = append(
+				problems,
+				fmt.Sprintf("need >=%d %s, have %d", want[caseType], caseType, n),
+			)
+		}
 	}
 	return problems
 }
@@ -254,38 +331,50 @@ func Scaffold(skillName string) *File {
 	return f
 }
 
-func normalize(raw []rawCase) []Case {
-	cases := make([]Case, 0, len(raw))
+// normalize converts raw cases to canonical ones, also reporting each way a case
+// differed from the form Write emits. The rewrites are collected here rather than
+// recomputed by the caller because the raw spelling is gone once a Case is built.
+func normalize(raw []rawCase) (cases []Case, rewrites []string) {
+	cases = make([]Case, 0, len(raw))
 	for i, r := range raw {
 		expected := r.Expected
-		if expected == "" {
+		if expected == "" && r.ExpectedBehavior != "" {
 			expected = r.ExpectedBehavior
+			rewrites = append(rewrites, fmt.Sprintf(
+				`case %d: legacy "expected_behavior" field; canonical is "expected"`, i+1))
+		}
+		id, why := caseID(r.ID, i)
+		if why != "" {
+			rewrites = append(rewrites, fmt.Sprintf("case %d: %s", i+1, why))
 		}
 		cases = append(cases, Case{
-			ID:       caseID(r.ID, i),
+			ID:       id,
 			Type:     r.Type,
 			Prompt:   r.Prompt,
 			Expected: expected,
 			Checks:   r.Checks,
 		})
 	}
-	return cases
+	return cases, rewrites
 }
 
 // caseID reads a numeric id, falling back to position+1 for string ids like
-// "should-trigger-01" so every case has a stable positive integer id.
-func caseID(raw json.RawMessage, index int) int {
+// "should-trigger-01" so every case has a stable positive integer id. The second
+// result names the rewrite that fallback performed, or "" when the on-disk id was
+// already a canonical JSON number.
+func caseID(raw json.RawMessage, index int) (id int, why string) {
 	if len(raw) > 0 {
 		var n int
 		if err := json.Unmarshal(raw, &n); err == nil {
-			return n
+			return n, ""
 		}
 		var s string
 		if err := json.Unmarshal(raw, &s); err == nil {
 			if n, err := strconv.Atoi(s); err == nil {
-				return n
+				return n, fmt.Sprintf("id %q is a string; canonical is the number %d", s, n)
 			}
+			return index + 1, fmt.Sprintf("id %q is not a number; renumbered to %d", s, index+1)
 		}
 	}
-	return index + 1
+	return index + 1, fmt.Sprintf("no id; numbered %d by position", index+1)
 }
