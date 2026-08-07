@@ -196,3 +196,53 @@ func TestLoadLeavesFrontmatterErrNilWhenValid(t *testing.T) {
 		t.Errorf("valid frontmatter must leave FrontmatterErr nil, got %v", s.FrontmatterErr)
 	}
 }
+
+func TestParseDoesNotDisturbContentIdentity(t *testing.T) {
+	t.Parallel()
+	// Hash is the identity manifests are pinned with and must be over the bytes as
+	// read. frontmatter.Split normalizes CRLF for what it returns; if that
+	// normalization ever reached Raw, every hash in every stored manifest would move.
+	dir := t.TempDir()
+	raw := "---\r\nname: a\r\ndescription: d\r\n---\r\nbody\r\n"
+	if err := os.WriteFile(filepath.Join(dir, skill.FileName), []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := skill.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Raw != raw {
+		t.Errorf("Raw was normalized: %q", s.Raw)
+	}
+	if s.Bytes != len(raw) {
+		t.Errorf("Bytes = %d, want %d (the bytes on disk)", s.Bytes, len(raw))
+	}
+	if got, want := s.Hash(), identity.Hash(raw); got != want {
+		t.Errorf("Hash = %q, want %q — identity over the raw bytes", got, want)
+	}
+}
+
+func TestParseReadsACRLFSkill(t *testing.T) {
+	t.Parallel()
+	// A Windows-authored skill must not look like one with no frontmatter, which is
+	// how it would be reported: "description is empty" on a file that plainly has one.
+	dir := t.TempDir()
+	raw := "---\r\nname: alpha\r\ndescription: Use when x.\r\n---\r\n## R\r\nbody\r\n"
+	if err := os.WriteFile(filepath.Join(dir, skill.FileName), []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := skill.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.FrontmatterErr != nil {
+		t.Fatalf("frontmatter did not parse: %v", s.FrontmatterErr)
+	}
+	if s.Name != "alpha" || s.Description != "Use when x." {
+		t.Errorf("got name=%q description=%q, want them read from the CRLF header",
+			s.Name, s.Description)
+	}
+	if strings.Contains(s.Body, "---") {
+		t.Errorf("delimiter leaked into the body: %q", s.Body)
+	}
+}
