@@ -146,3 +146,53 @@ func TestSlug(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadRecordsMalformedFrontmatter(t *testing.T) {
+	t.Parallel()
+	// A quoted scalar followed by unquoted text — the shape that actually appears in
+	// the book trees, and that YAML rejects.
+	const malformed = "---\n" +
+		"name: my-skill\n" +
+		"description: does a thing\n" +
+		`source_book: "Site Reliability Engineering" by Betsy Beyer` + "\n" +
+		"---\n# Body\n\nHello.\n"
+
+	dir := writeSkill(t, t.TempDir(), "my-skill", malformed)
+	s, err := skill.Load(dir)
+	if err != nil {
+		t.Fatalf("Load must still succeed: one malformed skill cannot stop a tree walk: %v", err)
+	}
+	if s.FrontmatterErr == nil {
+		t.Fatal("FrontmatterErr must record why the frontmatter did not parse")
+	}
+	// The contract is that the cause is recorded, not that it takes any particular
+	// shape — the message format belongs to the YAML library, so asserting on it
+	// would couple this test to that choice.
+	if s.FrontmatterErr.Error() == "" {
+		t.Error("FrontmatterErr must carry a message explaining the failure")
+	}
+	// The split happens before the parse, so callers that only need the body still
+	// get it. exegesis's index relies on this.
+	if !strings.Contains(s.Body, "Hello.") {
+		t.Errorf("Body must survive a frontmatter parse failure, got %q", s.Body)
+	}
+	if s.Raw != malformed {
+		t.Error("Raw must be the file verbatim regardless of parse outcome")
+	}
+	// The fields are zero because nothing could be read, not because they are absent.
+	if s.Name != "" || s.Description != "" || len(s.FrontmatterKeys) != 0 {
+		t.Errorf("expected zero fields alongside FrontmatterErr, got %+v", s)
+	}
+}
+
+func TestLoadLeavesFrontmatterErrNilWhenValid(t *testing.T) {
+	t.Parallel()
+	dir := writeSkill(t, t.TempDir(), "my-skill", sampleSkill)
+	s, err := skill.Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if s.FrontmatterErr != nil {
+		t.Errorf("valid frontmatter must leave FrontmatterErr nil, got %v", s.FrontmatterErr)
+	}
+}
