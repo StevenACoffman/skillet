@@ -35,6 +35,16 @@ type Skill struct {
 	Body            string   // markdown body after the frontmatter
 	Raw             string   // full file contents
 	Bytes           int      // byte size of Raw
+
+	// FrontmatterErr is the error from parsing the YAML frontmatter, or nil when it
+	// parsed. When it is non-nil, Name, Description and FrontmatterKeys are zero
+	// because nothing could be read out of the block — they are not evidence that
+	// those fields are absent from the file. A linter that reports "description is
+	// empty" without checking this sends the reader to the wrong line.
+	//
+	// The underlying YAML error is kept verbatim: it locates the offending line and
+	// column, which is the part a reader needs, and nothing classifies on it.
+	FrontmatterErr error
 }
 
 // Load reads and parses <dir>/SKILL.md. A missing SKILL.md is translated at this
@@ -141,7 +151,11 @@ func (s *Skill) parse() {
 	// and also yields the top-level keys exegesis lint needs.
 	var fields map[string]any
 	if err := yaml.Unmarshal([]byte(s.Frontmatter), &fields); err != nil {
-		return // malformed frontmatter leaves Name/Description empty; lint flags it
+		// Record why, rather than leaving Name/Description empty and letting a
+		// caller mistake the symptom for the defect. Load still succeeds: one
+		// malformed skill must not stop a caller walking a whole tree.
+		s.FrontmatterErr = err
+		return
 	}
 	keys := make([]string, 0, len(fields))
 	for k := range fields {

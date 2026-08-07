@@ -42,7 +42,17 @@ func AllowedFrontmatterKey(k string) bool {
 // that is empty, longer than DescriptionMaxRunes, or not plain text. An empty
 // result means the frontmatter satisfies the shared spec. It is pure over an
 // already-loaded skill.
+//
+// Frontmatter that did not parse is reported as itself and nothing else. Every
+// other check reads a field that could not be read, so a block with one YAML
+// syntax error would otherwise be reported as an empty description and a missing
+// name — symptoms dressed up as independent defects, pointing the reader at lines
+// that are perfectly fine.
 func Frontmatter(s *skill.Skill) []finding.Diagnostic {
+	if s.FrontmatterErr != nil {
+		return []finding.Diagnostic{diag(fmt.Sprintf(
+			"frontmatter: not valid YAML: %v", s.FrontmatterErr))}
+	}
 	var ds []finding.Diagnostic
 	for _, k := range s.FrontmatterKeys {
 		if !AllowedFrontmatterKey(k) {

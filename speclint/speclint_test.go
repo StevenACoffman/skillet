@@ -1,6 +1,7 @@
 package speclint_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -93,5 +94,39 @@ func assertDiagnostics(t *testing.T, got []finding.Diagnostic, wantSubs []string
 		if !strings.Contains(got[i].Message, want) {
 			t.Errorf("diagnostic %d = %q, want substring %q", i, got[i].Message, want)
 		}
+	}
+}
+
+func TestFrontmatterReportsAParseFailureAsItself(t *testing.T) {
+	t.Parallel()
+	// The shape found in the real book trees: a quoted scalar followed by unquoted
+	// text. Before this, the same skill produced "description is empty" and a
+	// missing name — both symptoms, neither the cause.
+	s := &skill.Skill{FrontmatterErr: errors.New("[3:45] value is not allowed in this context")}
+
+	got := speclint.Frontmatter(s)
+	if len(got) != 1 {
+		t.Fatalf("a parse failure must be the only diagnostic, got %+v", got)
+	}
+	if !strings.Contains(got[0].Message, "not valid YAML") {
+		t.Errorf("expected the cause to be named, got %q", got[0].Message)
+	}
+	if !strings.Contains(got[0].Message, "[3:45]") {
+		t.Errorf("expected the underlying error to be carried through, got %q", got[0].Message)
+	}
+	for _, d := range got {
+		if strings.Contains(d.Message, "description is empty") {
+			t.Error("must not report the symptom alongside the cause")
+		}
+	}
+}
+
+func TestFrontmatterUnaffectedWhenParseSucceeded(t *testing.T) {
+	t.Parallel()
+	// FrontmatterErr nil is the ordinary path: the other checks still apply.
+	s := &skill.Skill{FrontmatterKeys: []string{"name", "nope"}, Description: "fine"}
+	got := speclint.Frontmatter(s)
+	if len(got) != 1 || !strings.Contains(got[0].Message, `disallowed key "nope"`) {
+		t.Fatalf("expected the disallowed-key diagnostic, got %+v", got)
 	}
 }
