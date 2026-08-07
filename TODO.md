@@ -104,13 +104,89 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
 ### Skill Artifact
 
 - [x] `skill` — `Skill{...}`, `Load`, `Discover`/`DiscoverRoots`(over fsutil), `DefaultRoots`, `Slug`, `Hash()`→identity.  src: exegesis, skillsaw (goccy/go-yaml)
+- [x] `frontmatter` — **`Split(text) (block, body)`**, promoted out of `skill.splitFrontmatter`.
+      `exegesis merge-index` must read the YAML header of
+      `source-verification/<pair-id>-{r,a1}.md`, which is not a SKILL.md; the logic existed
+      but was unexported, and importing `skill` for a non-skill file would misplace the
+      dependency. Its own package, not `markdown` (which parses the *body*, with goldmark).
+      **Only the split is shared.** Both callers unmarshal into their own type — `skill` into
+      a map (it needs the key list), merge-index into a typed header — so a `Parse(text, v)`
+      convenience would be used by neither.
+      **Three defects fixed in the move**, each found by probing the old code rather than
+      reading it, and each mutation-tested:
+      (a) **an empty header** (`---\n---\nbody`) was not recognized — the closing delimiter
+      leaked into the body — because after stripping the opening line the closer sits at
+      offset 0 with no newline before it, which a `"\n---"` substring search cannot see. Now
+      scanned by line.
+      (b) **an unterminated header** silently ate the opening line. Now the document comes
+      back whole, so the one rule a caller needs is "empty block ⇒ body is everything".
+      (c) **CRLF normalization moved into `Split`.** It lived in `skill.parse`, i.e. in the
+      caller, so every future caller had to remember it — and one that forgets gets no error,
+      just an empty block, then reports fields as missing from a file that plainly has them
+      (the false-diagnostic class already fixed twice in this family).
+      `Skill.Raw` is untouched, so content identity cannot move: verified across the real
+      232-skill tree against a manifest written by the released skillet — **232 checked, 0
+      hashes moved**. Also verified that no skill in that tree is CRLF, empty-header or
+      unterminated, so (a)-(c) provably change nothing that exists today.
+      src: exegesis merge-index (2026-08-07)
 - [x] `manifest` — `Manifest{Tool,Tree,StructureVerified,Skills[]}` + per-skill sha256 (`Tool` is a Build param, not hardcoded).  src: exegesis
+- [x] `manifest` — **the read half: `Parse`, `Diff`, `Delta.Stale()`.** The package could
+      write a manifest but not consult one, so the skip-list it exists to enable had no
+      reader. `Diff(base, cur) Delta` partitions every location into
+      Added/Removed/Changed/Unchanged, and `Stale()` answers the one question a caller has
+      (what must I reprocess?) so two consumers cannot union those fields differently.
+      Three decisions the implementation turns on, each mutation-tested:
+      **(a) match on location, not slug** — `DiscoverRoots` scans four runtime roots, so
+      `.claude/skills/foo` and `.cursor/skills/foo` are distinct skills sharing a slug;
+      keying on slug silently collapses them, in precisely the consumer this is for.
+      **(b) take the location relative to each manifest's own `Tree`** — exegesis defaults
+      `tree := "."` while `TREE` as an argument is absolute, so one tree yields `Dir: "foo"`
+      or `Dir: "/abs/foo"` depending only on how it was invoked. Verified on the real
+      232-skill steve-skill-market tree: the two spellings produce 70KB and 44KB manifests
+      with no `Dir` in common, and `Diff` still reports 232 unchanged / 0 stale.
+      **(c) an unknown hash is Changed, never Unchanged** — `Hash` is `omitempty` and
+      exegesis leaves it empty when `skill.Load` failed, so calling it unchanged would
+      permanently skip a skill that was never hashed. A location recorded twice with
+      disagreeing hashes reuses the same rule rather than last-wins, which could otherwise
+      hide a real edit. Not added: a `Scan(tree)` helper — one prospective consumer
+      (`skillsaw changed`), held by the promote-on-second-consumer rule.
+      Consumers unblocked: skillsaw's hash-keyed skip list and its `structure_verified`
+      gate (both open in skillsaw/TODO.md).  src: skillsaw (2026-08-07)
 
 ### Verification
 
 - [x] `finding` — `Diagnostic{Severity,Category,Path,Message}`; `Result`; deterministic `Sort`.  src: exegesis, modelith-shaped
 - [x] `judge` — `Check{Op,Arg}`, op set + objective answer-scoring, `Score`→`Result{Hard,Soft,Why}`.  src: skillsaw⊃exegesis
 - [x] `testprompts` — `File`/`Case`/`Parse`(3 shapes)/`Write`/`Validate`/`Scaffold`/`DeriveChecks`/`Behavioral`/`Decoys`/`Find`/`ChecksFor`.  src: exegesis, skillsaw
+- [x] `testprompts` — **the case vocabulary is a value, not a hard-coded list.** `Validate`
+      held the accepted types and their minimums as two separate hard-coded lists, so a
+      caller with a fourth category could not gate at all: a conforming merged set returned
+      `case N: unknown type "prefer_merged_over_source"` twice, and `Tally` silently dropped
+      those cases because `Counts` has no field for them. New `Composition map[string]int` +
+      `Standard()` + `ValidateAgainst(want)` + `CountOf(type)`. The keys *are* the vocabulary
+      and the values are the minimums, so the two can no longer drift; a type mapped to 0 is
+      accepted but not required, which falls out for free.
+      **skillet does not learn what merging is** — exegesis supplies its own Composition.
+      Putting `TypePreferMerged`/`MinPreferMerged`/`ValidateMerged` here would be
+      special-purpose code inside a general mechanism.
+      `Standard()` is a function, not an exported map var: a shared map is mutable global
+      state, and one caller adding a type would change the rule for every other caller
+      in the process (mutation-tested). Strictly additive — `Validate`, `Tally`, `Counts`
+      and the `Min*` consts are untouched, and the `need >=N <type>, have M` message text is
+      byte-identical because the type name *is* the message token. Problem order is now
+      sorted (map iteration is randomized).  src: exegesis merge gate (2026-08-07)
+- [x] `testprompts` — **`Parse` reports the rewrites it performed** (`File.Rewrites`, excluded
+      from JSON). Third instance of the same defect class as `skill.parse` swallowing the YAML
+      error: `Parse` accepts three container shapes and several legacy per-case spellings while
+      `Write` emits one, so a write-back silently migrates the file — and the caller had no way
+      to know, making skillsaw's "refuse to write back over a non-canonical file" option
+      unimplementable. Reports the bare-array shape, the legacy `test_cases` key, per-case
+      `expected_behavior`, and each id that was renumbered or retyped. Found while enumerating
+      them: **when both `tests` and `test_cases` are populated the reader has always preferred
+      `tests` and dropped the rest**, so a write-back deletes cases still visible on disk —
+      now reported rather than silent. `[]string`, not a bool or an enum, because the caller
+      needs a reason for its message; `len()==0` still answers "was it canonical?".  src: skillsaw
+      test-prompts write-back (2026-08-07)
 - [x] `skill` — **stop swallowing the frontmatter YAML error.** `parse` discarded it, leaving `Name`/`Description`/`FrontmatterKeys` zero, so both consumers reported the *symptoms* (`description is empty`, `name "" != folder`) on a file whose description was plainly present. New `Skill.FrontmatterErr` records the cause; `speclint.Frontmatter` now reports it **and returns**, because every other check reads a field that could not be parsed and would dress a symptom up as an independent defect. `Load` still succeeds — one malformed skill must not halt a caller walking a tree, which is why this is not a `Load` error. Real case: a book skill with `source_book: "X" by Y` went from 3 defects (one of them false) to 1 naming `[10:45]` with a caret.  src: found while wiring skillsaw preflight (2026-08-06)
 - [x] `redlines` — **skip the trigger check when the frontmatter did not parse.** The last
       surviving instance of the defect fixed in `skill`/`speclint`: `checkTrigger` reads
@@ -124,12 +200,45 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       the offending book skill went 3 diagnostics → 2.  (2026-08-06)
 - [x] `redlines` — book2skill Quality Red Lines: `MaxQuoteWords`, `Check(s)→[]finding.Diagnostic` (six RIA-TV++ segments, quotation ceiling, description states a trigger). Deliberately **separate from `speclint`**: speclint encodes the agentskills.io spec and moves when the spec moves; the red lines encode book2skill's house rules and move when the methodology moves. Messages moved verbatim from exegesis so its CLI tests pass unchanged.  src: exegesis internal/lint (promoted 2026-08-06); 2nd consumer skillsaw (pending)
 - [x] `speclint` — agentskills.io frontmatter spec: `DescriptionMaxRunes`, `AllowedFrontmatterKey`, `Frontmatter(s)→[]finding.Diagnostic`. Single source of truth so exegesis (gates the findings) and skillsaw (scores the cap) can't drift by hand. Name-format policy stays per-tool (exegesis=folder, skillsaw=kebab).  src: exegesis lint + skillsaw rubric (de-duplicated 2026-08-03)
+- [x] `redlines` — **export `Quotes(body) []string`** so `exegesis quotecheck` can locate the
+      same blockquote runs the `MaxQuoteWords` red line counts. Extraction was fused into
+      `checkQuotes`; it is now one definition with two users. Exported from `redlines` rather
+      than `markdown` deliberately: the point is that the fabrication guard and the red line
+      agree on *what counts as a quote*, and a second extractor would disagree at the margins
+      (fences, lazy continuation) — the two tools would then dispute the rule being enforced.
+      `Quotes` strips fenced code itself, so a direct caller gets the same answer as `Check`
+      (the strip is idempotent, so `Check` is unaffected); a `>` line inside a shell transcript
+      is not a quotation. Runs of bare `>` markers carry no text and are not returned.
+      src: exegesis quotecheck (2026-08-07)
 
 ### Experiment Adjudication (2Nd Consumer: Adh `verdict`, 2026-08-04)
 
 - [x] `stats` — `Wilson(k,n)` + `McNemar(improved,regressed)`.     src: skillsaw (Wilson), adh verdict (McNemar)
 - [x] `ratchet` — `Evaluate`/`SelectScore` gate + activation `Score` confusion matrix (one package, 2 files).  src: skillsaw; adh adopted it (deleted its duplicate internal/gate)
 - [x] `auditlog` — `Row` + `Read`/`Append` (results.tsv).          src: skillsaw (single consumer — adh has no audit log)
+- [x] `timeseries` — **regression gate: `Detect(history, current, Config) Verdict`.** A gate
+      that asks "is this worse than we were?" rather than "is this good enough?" — it catches a
+      slide that never crosses the absolute bar and tolerates a metric that is low but stable.
+      Promoted on the 2nd consumer rule: wanted by skillsaw (TODO "regression gate") *and*
+      exegesis (TODO, "the one plausible touch"). Pure; the caller owns storage, so the
+      reference's `SaveToFile`/`LoadFromFile` stay out.
+      **Four defects in the reference (`unified-thinking/benchmarks/reporting/timeseries.go`)
+      deliberately not inherited**, each mutation-tested here:
+      (a) it is **not a rolling window** despite both TODOs describing it that way —
+      `DetectRegression` breaks at the first entry with a value, so the baseline is the single
+      most recent run and one good run becomes the bar for every run after it. Averaging does
+      not erase that run, it dilutes it to 1/N, which is the point.
+      (b) **`baseline == 0` is read as "no baseline"**, so a metric genuinely sitting at zero
+      can never report a regression — exactly when a gate matters. Absence of history is a
+      different state, carried by `Verdict.Compared`.
+      (c) **degradation is relative** (`(baseline-current)/baseline`), undefined at zero and
+      explosive near it. `Tolerance` is absolute, in the metric's own units; the family's
+      metrics (1-10 rubric, 0-1 accuracy) have meaningful absolute scales.
+      (d) it returns **`(bool, string)`**, fusing the verdict with a formatted message so a
+      caller cannot render it differently and a test must string-match.
+      Too little history yields `Compared:false, Regressed:false` — a gate that fails the first
+      time a metric is recorded can only be fixed by not measuring. `MinHistory` defaults to 2,
+      not 1, so a lone prior run never becomes the bar.  src: skillsaw + exegesis (2026-08-07)
 
 ### Rules / Distillation
 

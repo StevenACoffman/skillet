@@ -59,6 +59,38 @@ func Check(s *skill.Skill) []finding.Diagnostic {
 	return ds
 }
 
+// Quotes returns each contiguous blockquote in body, in document order: one string per
+// run, with the "> " markers stripped and the run's lines joined by a single space.
+//
+// Fenced code blocks are removed first, so a "> " line inside a shell transcript or a
+// diff is not mistaken for a quotation. A run of bare ">" lines carries no text and is
+// not returned.
+//
+// This is exported because it is the same extraction the MaxQuoteWords red line counts.
+// A caller checking quotations against their sources needs to agree with the rule being
+// enforced; a second implementation elsewhere would disagree at the margins — over
+// fences, over lazy continuation — and the two tools would then dispute what a quote is.
+//
+// Ensures: every returned string contains at least one non-space character; it is pure.
+func Quotes(body string) []string {
+	var out, run []string
+	flush := func() {
+		if joined := strings.Join(run, " "); strings.TrimSpace(joined) != "" {
+			out = append(out, joined)
+		}
+		run = run[:0]
+	}
+	for _, line := range strings.Split(reFence.ReplaceAllString(body, ""), "\n") {
+		if t := strings.TrimSpace(line); strings.HasPrefix(t, ">") {
+			run = append(run, strings.TrimSpace(strings.TrimPrefix(t, ">")))
+			continue
+		}
+		flush()
+	}
+	flush()
+	return out
+}
+
 // checkSegments flags any missing RIA segment. A segment is present when a "## "
 // heading's first token (its leading letters/digits, upper-cased) is the label.
 func checkSegments(body string) []finding.Diagnostic {
@@ -102,24 +134,14 @@ func leadingAlnum(s string) string {
 // checkQuotes flags each contiguous blockquote whose word count exceeds the limit.
 func checkQuotes(body string) []finding.Diagnostic {
 	var ds []finding.Diagnostic
-	var quote []string
-	flush := func() {
-		if n := len(strings.Fields(strings.Join(quote, " "))); n > MaxQuoteWords {
+	for _, q := range Quotes(body) {
+		if n := len(strings.Fields(q)); n > MaxQuoteWords {
 			ds = append(
 				ds,
 				diagf("redline: a quotation is %d words, over the %d-word limit", n, MaxQuoteWords),
 			)
 		}
-		quote = quote[:0]
 	}
-	for _, line := range strings.Split(body, "\n") {
-		if t := strings.TrimSpace(line); strings.HasPrefix(t, ">") {
-			quote = append(quote, strings.TrimSpace(strings.TrimPrefix(t, ">")))
-			continue
-		}
-		flush()
-	}
-	flush()
 	return ds
 }
 

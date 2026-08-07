@@ -17,6 +17,7 @@ import (
 	"github.com/goccy/go-yaml"
 
 	"github.com/StevenACoffman/skillet/errs"
+	"github.com/StevenACoffman/skillet/frontmatter"
 	"github.com/StevenACoffman/skillet/fsutil"
 	"github.com/StevenACoffman/skillet/identity"
 )
@@ -144,8 +145,9 @@ func joinFS(base string, subs []string) []string {
 }
 
 func (s *Skill) parse() {
-	text := strings.ReplaceAll(s.Raw, "\r\n", "\n")
-	s.Frontmatter, s.Body = splitFrontmatter(text)
+	// Raw is left exactly as read: Hash is the content identity over those bytes, and
+	// frontmatter.Split normalizes line endings only for what it returns.
+	s.Frontmatter, s.Body = frontmatter.Split(s.Raw)
 
 	// Ordered/unordered does not matter for the allowlist check; a map suffices
 	// and also yields the top-level keys exegesis lint needs.
@@ -172,23 +174,4 @@ func asString(v any) string {
 		return s
 	}
 	return ""
-}
-
-// splitFrontmatter separates a leading "---"-delimited YAML block from the body.
-// It returns ("", text) when there is no frontmatter and ("", rest) when the
-// opening delimiter has no matching close.
-func splitFrontmatter(text string) (frontmatter, body string) {
-	if !strings.HasPrefix(text, "---\n") {
-		return "", text
-	}
-	rest := text[len("---\n"):]
-	end := strings.Index(rest, "\n---")
-	if end < 0 {
-		return "", rest
-	}
-	after := rest[end+len("\n---"):]
-	if nl := strings.IndexByte(after, '\n'); nl >= 0 {
-		body = after[nl+1:]
-	}
-	return rest[:end], body
 }

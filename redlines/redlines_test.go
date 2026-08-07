@@ -163,3 +163,82 @@ func TestCheckStillDemandsATriggerWhenTheBlockParsed(t *testing.T) {
 		t.Errorf("a genuinely absent description must still be reported, got %+v", got)
 	}
 }
+
+func TestQuotes(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		body string
+		want []string
+	}{
+		"no blockquote": {body: "plain prose\n\nmore prose"},
+		"one run joins its lines": {
+			body: "intro\n> first line\n> second line\nafter",
+			want: []string{"first line second line"},
+		},
+		"a blank line ends the run": {
+			body: "> alpha\n\n> beta",
+			want: []string{"alpha", "beta"},
+		},
+		"runs come back in document order": {
+			body: "> one\ntext\n> two\ntext\n> three",
+			want: []string{"one", "two", "three"},
+		},
+		// The red line counts words, so a ">" line inside a shell transcript would
+		// otherwise inflate a quotation that is not one.
+		"a fenced block is not a quotation": {
+			body: "```\n> not a quote\n> still not\n```\n> a real one",
+			want: []string{"a real one"},
+		},
+		"tilde fences count too": {
+			body: "~~~\n> nope\n~~~\nprose",
+		},
+		"bare markers carry no text": {body: ">\n>\n>"},
+		"indented markers still count": {
+			body: "  > indented quote",
+			want: []string{"indented quote"},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			got := redlines.Quotes(tc.body)
+			if len(got) != len(tc.want) {
+				t.Fatalf("Quotes returned %d runs %q, want %d %q",
+					len(got), got, len(tc.want), tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Errorf("run %d = %q, want %q", i, got[i], tc.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestQuotesAgreesWithTheRedLineItBacks(t *testing.T) {
+	t.Parallel()
+	// The reason Quotes is exported: a caller must be able to reproduce exactly which
+	// runs the MaxQuoteWords red line will complain about.
+	long := strings.Repeat("word ", redlines.MaxQuoteWords+1)
+	body := "> short quote\n\n> " + long + "\n\nprose"
+	quotes := redlines.Quotes(body)
+	if len(quotes) != 2 {
+		t.Fatalf("expected 2 runs, got %d: %q", len(quotes), quotes)
+	}
+	over := 0
+	for _, q := range quotes {
+		if len(strings.Fields(q)) > redlines.MaxQuoteWords {
+			over++
+		}
+	}
+	s := &skill.Skill{Body: body, Description: "Use when x. Trigger on y."}
+	ds := 0
+	for _, d := range redlines.Check(s) {
+		if strings.Contains(d.Message, "over the") {
+			ds++
+		}
+	}
+	if over != ds {
+		t.Errorf("Quotes says %d runs are over the limit, Check reports %d", over, ds)
+	}
+}
