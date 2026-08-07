@@ -3,6 +3,7 @@ package manifest_test
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/StevenACoffman/skillet/manifest"
@@ -51,5 +52,210 @@ func TestMarshal(t *testing.T) {
 		if bytes.Count(b, []byte(`"sha256"`)) != 1 {
 			t.Errorf("omitempty: expected exactly one sha256 field, got:\n%s", b)
 		}
+	}
+}
+
+func TestParseRoundTripsMarshal(t *testing.T) {
+	t.Parallel()
+	want := manifest.Build("exegesis", "/t", []manifest.Skill{
+		{Slug: "b", Dir: "/t/b", Hash: "bbb", TestPrompts: "/t/b/test-prompts.json"},
+		{Slug: "a", Dir: "/t/a", Hash: "aaa"},
+	}, true)
+	b, err := want.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := manifest.Parse(b)
+	if err != nil {
+		t.Fatalf("Parse rejected our own Marshal output: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("round trip lost data:\n got %+v\nwant %+v", got, want)
+	}
+}
+
+func TestParseRejectsAFileThatIsNotAManifest(t *testing.T) {
+	t.Parallel()
+	// The mistake this guards is aiming --manifest at the wrong JSON file: it
+	// unmarshals cleanly into a zero Manifest, and a diff against an empty tree
+	// reports every skill as added, which reads like a real answer.
+	cases := map[string]string{
+		"unrelated json object": `{"name":"something-else","version":2}`,
+		"empty object":          `{}`,
+		"manifest shape but no tool": `{"tree":"/t","structure_verified":true,` +
+			`"skills":[{"slug":"a","dir":"/t/a"}]}`,
+	}
+	for name, in := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if _, err := manifest.Parse([]byte(in)); err == nil {
+				t.Error("Parse accepted a document with no tool field")
+			}
+		})
+	}
+}
+
+func TestParseReportsMalformedJSON(t *testing.T) {
+	t.Parallel()
+	if _, err := manifest.Parse([]byte(`{"tool":`)); err == nil {
+		t.Error("Parse accepted truncated JSON")
+	}
+}
+
+func TestParseIgnoresUnknownFields(t *testing.T) {
+	t.Parallel()
+	// A manifest from a newer tool must still read, so the reader is not a
+	// version gate on the writer.
+	m, err := manifest.Parse([]byte(
+		`{"tool":"exegesis","tree":"/t","skills":[],"future_field":{"x":1}}`))
+	if err != nil {
+		t.Fatalf("Parse rejected a manifest carrying an unknown field: %v", err)
+	}
+	if m.Tool != "exegesis" || m.Tree != "/t" {
+		t.Errorf("known fields lost alongside the unknown one: %+v", m)
+	}
+}
+
+// tree assembles a scanned-side manifest the way a caller does: a struct literal, since
+// Tool and StructureVerified have no meaning before verification has run.
+func tree(root string, skills ...manifest.Skill) manifest.Manifest {
+	return manifest.Manifest{Tree: root, Skills: skills}
+}
+
+func TestDiffPartitionsTheUnion(t *testing.T) {
+	t.Parallel()
+	base := tree("/t",
+		manifest.Skill{Slug: "keep", Dir: "/t/keep", Hash: "h1"},
+		manifest.Skill{Slug: "edit", Dir: "/t/edit", Hash: "h2"},
+		manifest.Skill{Slug: "gone", Dir: "/t/gone", Hash: "h3"},
+	)
+	cur := tree("/t",
+		manifest.Skill{Slug: "keep", Dir: "/t/keep", Hash: "h1"},
+		manifest.Skill{Slug: "edit", Dir: "/t/edit", Hash: "h2-changed"},
+		manifest.Skill{Slug: "new", Dir: "/t/new", Hash: "h4"},
+	)
+	d := manifest.Diff(base, cur)
+	for _, tc := range []struct {
+		name string
+		got  []string
+		want []string
+	}{
+		{"added", d.Added, []string{"new"}},
+		{"removed", d.Removed, []string{"gone"}},
+		{"changed", d.Changed, []string{"edit"}},
+		{"unchanged", d.Unchanged, []string{"keep"}},
+		{"stale", d.Stale(), []string{"edit", "new"}},
+	} {
+		if !reflect.DeepEqual(tc.got, tc.want) {
+			t.Errorf("%s = %v, want %v", tc.name, tc.got, tc.want)
+		}
+	}
+	// Totality: every location in either manifest lands in exactly one slice.
+	if n := len(d.Added) + len(d.Removed) + len(d.Changed) + len(d.Unchanged); n != 4 {
+		t.Errorf("slices hold %d locations, want the 4 in the union: %+v", n, d)
+	}
+}
+
+func TestDiffMatchesTheSameTreeSpelledDifferently(t *testing.T) {
+	t.Parallel()
+	// exegesis defaults tree to "." while --tree takes an absolute path, so the same
+	// skill is recorded as "foo" by one run and "/t/foo" by another. Matching on the
+	// raw Dir would report every skill as both added and removed.
+	relative := tree(".", manifest.Skill{Slug: "foo", Dir: "foo", Hash: "h1"})
+	absolute := tree("/t", manifest.Skill{Slug: "foo", Dir: "/t/foo", Hash: "h1"})
+	d := manifest.Diff(relative, absolute)
+	if len(d.Unchanged) != 1 || d.Unchanged[0] != "foo" {
+		t.Errorf("same tree spelled two ways did not match: %+v", d)
+	}
+	if len(d.Stale()) != 0 {
+		t.Errorf("nothing changed, but Stale reports %v", d.Stale())
+	}
+}
+
+func TestDiffKeepsCollidingSlugsApart(t *testing.T) {
+	t.Parallel()
+	// skill.DiscoverRoots scans several runtime roots, so two distinct skills can
+	// share a slug. Matching on slug would collapse them and hide one's edit.
+	base := tree(".",
+		manifest.Skill{Slug: "foo", Dir: ".claude/skills/foo", Hash: "h1"},
+		manifest.Skill{Slug: "foo", Dir: ".cursor/skills/foo", Hash: "h2"},
+	)
+	cur := tree(".",
+		manifest.Skill{Slug: "foo", Dir: ".claude/skills/foo", Hash: "h1"},
+		manifest.Skill{Slug: "foo", Dir: ".cursor/skills/foo", Hash: "h2-edited"},
+	)
+	d := manifest.Diff(base, cur)
+	if !reflect.DeepEqual(d.Changed, []string{".cursor/skills/foo"}) {
+		t.Errorf("Changed = %v, want only the edited .cursor copy", d.Changed)
+	}
+	if !reflect.DeepEqual(d.Unchanged, []string{".claude/skills/foo"}) {
+		t.Errorf("Unchanged = %v, want the untouched .claude copy", d.Unchanged)
+	}
+}
+
+func TestDiffTreatsAnUnknownHashAsChanged(t *testing.T) {
+	t.Parallel()
+	// Hash is omitempty and a writer leaves it empty when the skill would not load.
+	// Calling that unchanged would permanently skip a skill that was never hashed.
+	cases := map[string]struct{ baseHash, curHash string }{
+		"unknown on the base side":  {"", "h1"},
+		"unknown on the cur side":   {"h1", ""},
+		"unknown on both sides":     {"", ""},
+		"known and equal (control)": {"h1", "h1"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			d := manifest.Diff(
+				tree("/t", manifest.Skill{Slug: "a", Dir: "/t/a", Hash: tc.baseHash}),
+				tree("/t", manifest.Skill{Slug: "a", Dir: "/t/a", Hash: tc.curHash}),
+			)
+			wantChanged := tc.baseHash == "" || tc.curHash == ""
+			if got := len(d.Changed) == 1; got != wantChanged {
+				t.Errorf("changed=%t, want %t (base %q, cur %q): %+v",
+					got, wantChanged, tc.baseHash, tc.curHash, d)
+			}
+		})
+	}
+}
+
+func TestDiffDoesNotLetADuplicateLocationHideAChange(t *testing.T) {
+	t.Parallel()
+	// Two entries disagreeing about one location leave its hash unknowable. Last-wins
+	// could pick the one that matches base and report no change at all.
+	base := tree("/t", manifest.Skill{Slug: "a", Dir: "/t/a", Hash: "h1"})
+	cur := tree("/t",
+		manifest.Skill{Slug: "a", Dir: "/t/a", Hash: "h2"},
+		manifest.Skill{Slug: "a", Dir: "/t/a", Hash: "h1"},
+	)
+	if d := manifest.Diff(base, cur); !reflect.DeepEqual(d.Changed, []string{"a"}) {
+		t.Errorf("a contradicted location must count as changed, got %+v", d)
+	}
+}
+
+func TestDiffAgainstAnEmptyBaseReportsEverythingAdded(t *testing.T) {
+	t.Parallel()
+	cur := tree("/t",
+		manifest.Skill{Slug: "b", Dir: "/t/b", Hash: "h2"},
+		manifest.Skill{Slug: "a", Dir: "/t/a", Hash: "h1"},
+	)
+	d := manifest.Diff(manifest.Manifest{}, cur)
+	if !reflect.DeepEqual(d.Added, []string{"a", "b"}) {
+		t.Errorf("Added = %v, want both, sorted", d.Added)
+	}
+	if !reflect.DeepEqual(d.Stale(), []string{"a", "b"}) {
+		t.Errorf("Stale = %v, want both", d.Stale())
+	}
+}
+
+func TestDiffOfAManifestWithItselfIsAllUnchanged(t *testing.T) {
+	t.Parallel()
+	m := manifest.Build("exegesis", "/t", []manifest.Skill{
+		{Slug: "a", Dir: "/t/a", Hash: "h1"},
+		{Slug: "b", Dir: "/t/b", Hash: "h2"},
+	}, true)
+	d := manifest.Diff(m, m)
+	if len(d.Stale()) != 0 || len(d.Removed) != 0 || len(d.Unchanged) != 2 {
+		t.Errorf("a manifest must not differ from itself: %+v", d)
 	}
 }
