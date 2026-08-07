@@ -45,7 +45,17 @@ func Check(s *skill.Skill) []finding.Diagnostic {
 	var ds []finding.Diagnostic
 	ds = append(ds, checkSegments(body)...)
 	ds = append(ds, checkQuotes(body)...)
-	ds = append(ds, checkTrigger(s.Description)...)
+	// Only ask for a trigger when there was a description to read; see the note on
+	// skill.Skill.FrontmatterErr. An unparsed block leaves Description empty, and
+	// demanding a trigger of it reports a consequence of the YAML error as a defect
+	// in prose the author did write.
+	//
+	// The two checks above are not guarded: they read the body, which
+	// splitFrontmatter produces before the parse is attempted, so their findings are
+	// real either way.
+	if s.FrontmatterErr == nil {
+		ds = append(ds, checkTrigger(s.Description)...)
+	}
 	return ds
 }
 

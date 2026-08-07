@@ -1,6 +1,7 @@
 package redlines_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -120,5 +121,45 @@ func TestCheckIsPure(t *testing.T) {
 	redlines.Check(s)
 	if s.Body != body || s.Description != desc {
 		t.Error("Check mutated the skill it was given")
+	}
+}
+
+func TestCheckSkipsTheTriggerWhenFrontmatterDidNotParse(t *testing.T) {
+	t.Parallel()
+	// The description is empty because the YAML failed, not because the author
+	// omitted a trigger. The body-derived red lines must still fire: a blanket
+	// suppression would hide the over-long quotation, which is a real defect.
+	s := load(allSegments+"\n> "+strings.Repeat("word ", redlines.MaxQuoteWords+1), "")
+	s.FrontmatterErr = errors.New("[10:45] value is not allowed in this context")
+
+	got := redlines.Check(s)
+	if len(got) != 1 {
+		t.Fatalf("expected only the quotation defect, got %+v", got)
+	}
+	if !strings.Contains(got[0].Message, "over the 150-word limit") {
+		t.Errorf("the body-derived red line must survive, got %q", got[0].Message)
+	}
+	for _, d := range got {
+		if strings.Contains(d.Message, "trigger condition") {
+			t.Error("must not demand a trigger from a description that could not be read")
+		}
+	}
+}
+
+func TestCheckStillDemandsATriggerWhenTheBlockParsed(t *testing.T) {
+	t.Parallel()
+	// The over-suppression trap: a file with no frontmatter at all parses fine
+	// (yaml.Unmarshal("") succeeds), so an author who really did omit the
+	// description must still be told. Silencing this would trade a false positive
+	// for a false negative.
+	got := redlines.Check(load(allSegments, ""))
+	found := false
+	for _, d := range got {
+		if strings.Contains(d.Message, "trigger condition") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("a genuinely absent description must still be reported, got %+v", got)
 	}
 }
