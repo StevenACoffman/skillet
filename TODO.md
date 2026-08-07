@@ -112,6 +112,16 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
 - [x] `judge` — `Check{Op,Arg}`, op set + objective answer-scoring, `Score`→`Result{Hard,Soft,Why}`.  src: skillsaw⊃exegesis
 - [x] `testprompts` — `File`/`Case`/`Parse`(3 shapes)/`Write`/`Validate`/`Scaffold`/`DeriveChecks`/`Behavioral`/`Decoys`/`Find`/`ChecksFor`.  src: exegesis, skillsaw
 - [x] `skill` — **stop swallowing the frontmatter YAML error.** `parse` discarded it, leaving `Name`/`Description`/`FrontmatterKeys` zero, so both consumers reported the *symptoms* (`description is empty`, `name "" != folder`) on a file whose description was plainly present. New `Skill.FrontmatterErr` records the cause; `speclint.Frontmatter` now reports it **and returns**, because every other check reads a field that could not be parsed and would dress a symptom up as an independent defect. `Load` still succeeds — one malformed skill must not halt a caller walking a tree, which is why this is not a `Load` error. Real case: a book skill with `source_book: "X" by Y` went from 3 defects (one of them false) to 1 naming `[10:45]` with a caret.  src: found while wiring skillsaw preflight (2026-08-06)
+- [x] `redlines` — **skip the trigger check when the frontmatter did not parse.** The last
+      surviving instance of the defect fixed in `skill`/`speclint`: `checkTrigger` reads
+      `Description`, which an unparsed block leaves empty, so it demanded a trigger of prose
+      the author did write. Guarded on `FrontmatterErr`. Only that check — `checkSegments` and
+      `checkQuotes` read the body, which `splitFrontmatter` produces before the parse is
+      attempted, and a blanket suppression would have hidden a real 219-word quotation on the
+      very skill that exposed this. A skill with no frontmatter at all still gets the trigger
+      diagnostic, since `yaml.Unmarshal("")` succeeds — silencing that would trade a false
+      positive for a false negative. Verified end to end: `exegesis lint --check redlines` on
+      the offending book skill went 3 diagnostics → 2.  (2026-08-06)
 - [x] `redlines` — book2skill Quality Red Lines: `MaxQuoteWords`, `Check(s)→[]finding.Diagnostic` (six RIA-TV++ segments, quotation ceiling, description states a trigger). Deliberately **separate from `speclint`**: speclint encodes the agentskills.io spec and moves when the spec moves; the red lines encode book2skill's house rules and move when the methodology moves. Messages moved verbatim from exegesis so its CLI tests pass unchanged.  src: exegesis internal/lint (promoted 2026-08-06); 2nd consumer skillsaw (pending)
 - [x] `speclint` — agentskills.io frontmatter spec: `DescriptionMaxRunes`, `AllowedFrontmatterKey`, `Frontmatter(s)→[]finding.Diagnostic`. Single source of truth so exegesis (gates the findings) and skillsaw (scores the cap) can't drift by hand. Name-format policy stays per-tool (exegesis=folder, skillsaw=kebab).  src: exegesis lint + skillsaw rubric (de-duplicated 2026-08-03)
 
