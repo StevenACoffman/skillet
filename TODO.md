@@ -198,8 +198,24 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       diagnostic, since `yaml.Unmarshal("")` succeeds — silencing that would trade a false
       positive for a false negative. Verified end to end: `exegesis lint --check redlines` on
       the offending book skill went 3 diagnostics → 2.  (2026-08-06)
-- [x] `redlines` — book2skill Quality Red Lines: `MaxQuoteWords`, `Check(s)→[]finding.Diagnostic` (six RIA-TV++ segments, quotation ceiling, description states a trigger). Deliberately **separate from `speclint`**: speclint encodes the agentskills.io spec and moves when the spec moves; the red lines encode book2skill's house rules and move when the methodology moves. Messages moved verbatim from exegesis so its CLI tests pass unchanged.  src: exegesis internal/lint (promoted 2026-08-06); 2nd consumer skillsaw (pending)
+- [x] `redlines` — book2skill Quality Red Lines: `MaxQuoteWords`, `Check(s)→[]finding.Diagnostic` (six RIA-TV++ segments, quotation ceiling, description states a trigger). Deliberately **separate from `speclint`**: speclint encodes the agentskills.io spec and moves when the spec moves; the red lines encode book2skill's house rules and move when the methodology moves. Messages moved verbatim from exegesis so its CLI tests pass unchanged.  src: exegesis internal/lint (promoted 2026-08-06); 2nd consumer skillsaw, wired (`internal/edit`, `preflight --redlines`) — verified 2026-08-08
 - [x] `speclint` — agentskills.io frontmatter spec: `DescriptionMaxRunes`, `AllowedFrontmatterKey`, `Frontmatter(s)→[]finding.Diagnostic`. Single source of truth so exegesis (gates the findings) and skillsaw (scores the cap) can't drift by hand. Name-format policy stays per-tool (exegesis=folder, skillsaw=kebab).  src: exegesis lint + skillsaw rubric (de-duplicated 2026-08-03)
+- [ ] `speclint` — **the allowlist did not match the spec; corrected 2026-08-08, needs a tag.**
+      Checked against <https://agentskills.io/specification>: the defined keys are `name`,
+      `description`, `license`, `compatibility`, `metadata`, `allowed-tools`.
+      `AllowedFrontmatterKey` admitted four of them and **rejected `license`, `compatibility`
+      and `metadata`** — a skill declaring its own license was told the key does not exist.
+      Being the single source of truth for the spec is worth nothing if the copy is wrong.
+      `tags` stays permitted as the one deliberate deviation, documented at the switch: the
+      spec does not define it, but 163 installed skills and every book2skill output carry it,
+      so rejecting it would report a defect on nearly every skill rather than describe one.
+      `author` and `version` are **not** top-level keys at any level of the spec — its own
+      example carries both inside `metadata` — and the merge-skills doc and template that
+      claimed otherwise are corrected.
+      Widening can only *reduce* findings, so no consumer newly fails. **To release:** tag,
+      then `go get` in exegesis and skillsaw. Two consequences worth watching: `metadata`
+      values are string-only and nothing checks that yet, and merge-skills' retirement
+      Option 3 (`metadata: {superseded-by: …}`) stops needing a new key here.
 - [x] `redlines` — **export `Quotes(body) []string`** so `exegesis quotecheck` can locate the
       same blockquote runs the `MaxQuoteWords` red line counts. Extraction was fused into
       `checkQuotes`; it is now one definition with two users. Exported from `redlines` rather
@@ -361,6 +377,19 @@ already owns.
   Consumers: adh (critic/judge/evaluation confidence vs closed-arc outcomes) and skillsaw
   (rubric/judge scores vs realized quality) — see their TODOs. Give it the same
   property-based + example test treatment `stats` warrants.
+- [ ] Candidate refinement — **`testprompts.File.Rewrites` can be printed but not
+  classified.** It is `[]string` written for a human, which serves the "say what changed"
+  case it was built for. But `exegesis tests --migrate` needs one rewrite treated
+  differently from the others: a file carrying both `tests` and `test_cases` loses cases
+  on write-back, so migrating it must be refused rather than reported. Deciding that from
+  the slice would mean substring-matching a human-readable string to decide whether to
+  destroy someone's work, which breaks the first time the wording changes — so exegesis
+  re-reads the raw JSON for the two keys instead (exegesis `cmd/tests`,
+  `refuseIfCasesWouldBeLost`).
+  That duplication is small and deliberate, and one consumer is not evidence for a
+  redesign. Recorded so the second caller that needs to *act* on a specific rewrite —
+  rather than print them all — is recognised as the trigger, at which point a typed kind
+  beside the message is the obvious shape. Found while building `--migrate` (2026-08-07).
 - [ ] Deferred — a possible `skillet/bandit` (Thompson Sampling: Beta-Bernoulli +
   Marsaglia-Tsang Gamma sampling, plus entropy/convergence diagnostics) if a 2nd consumer
   wants principled strategy selection under uncertainty. unified-thinking's
