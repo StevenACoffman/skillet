@@ -230,6 +230,47 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       (the strip is idempotent, so `Check` is unaffected); a `>` line inside a shell transcript
       is not a quotation. Runs of bare `>` markers carry no text and are not returned.
       src: exegesis quotecheck (2026-08-07)
+- [ ] `skilllens` — **the three SkillLens quality dimensions, promoted on the 2nd consumer
+      rule. This one is overdue: both consumers already exist and have already diverged.**
+      The dimensions come from `microsoft/SkillLens`
+      (`data/meta_skills/quality_rubric_3dim.md`, arXiv:2605.23899) — failure-mechanism
+      encoding, actionable specificity, and a high-risk action blacklist, each validated at
+      65–66% predictive accuracy against downstream skill utility. skillsaw scores them as
+      rubric dims 3/5/9 (35 of its 100 points) and adh scores them as `failure-handling` /
+      `actionable-specificity` / `boundary-section` (**60** of its 100). Two consumers,
+      two independent implementations, zero shared code — the exact drift `redlines` and
+      `speclint` were promoted to prevent, and the one place it has already happened.
+      **The detectors are unimportable, which is why adh reimplemented rather than reused.**
+      They live in `skillsaw/internal/rubric/rubric.go`: the `failureEN`/`failureCN` regexes
+      (inline `if/when X fails|errors|times out|not found` branches), and the `FailureSections`,
+      `Softening` and `BlacklistHeadings` vocabularies on `Config`. `internal/` makes them
+      unreachable from adh, exegesis or canonizer; nothing about them is skillsaw-specific.
+      Shape — pure, over an already-parsed doc, matching `neutrality`/`redlines`:
+      `FailureMechanisms(d markdown.Doc) []Span`, `SofteningPhrases(d markdown.Doc) []Span`,
+      `BlacklistSections(d markdown.Doc) []Span`. Take `markdown.Doc` and not a raw string so
+      `Doc.Prose` (code blocks and spans already blanked) is what gets matched — skillsaw
+      relies on that today, and a caller passing raw text would match a `# Boundary` inside a
+      shell transcript.
+      **Return spans, not diagnostics.** `redlines` and `speclint` return
+      `[]finding.Diagnostic` because each *is* a gate with a fixed severity. These are not:
+      skillsaw turns them into 1-10 rubric penalties, adh into a 0..1 factor, and exegesis
+      would want error-vs-warning per check. Returning `Diagnostic` would force a severity
+      here that all three callers then have to unpick, so return the located evidence and
+      let each consumer decide what it means.
+      **Carry the bilingual vocabulary verbatim.** skillsaw's lists cover both the
+      Chinese darwin-source terms and English equivalents, on the deliberate ground that
+      "a China-only list scores every English skill as defect-free, which is the opposite
+      of useful" (`rubric.go:88-92`). Dropping half on the way up would silently widen
+      what passes.
+      **Not promoted: the weights or the 1-10 scale.** Those are rubric policy and they
+      legitimately differ — skillsaw weights the three at 35, adh at 60, because they grade
+      different artifacts. Same rule that kept `speclint`'s cap here and the scoring
+      penalties in skillsaw.
+      Consumers on landing: skillsaw dims 3/5/9 and adh `failure-handling`/`boundary-section`
+      (both delete a private copy), then exegesis's proposed `--check skilllens` tier and
+      canonizer's `verify.Specificity` — see those TODOs.
+      src: skillsaw `internal/rubric` + adh `internal/rubric` (2026-08-08); analysis in
+      `~/Documents/agent-orange/skillopt_changes_findings.md`
 
 ### Experiment Adjudication (2Nd Consumer: Adh `verdict`, 2026-08-04)
 
