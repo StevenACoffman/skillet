@@ -230,8 +230,8 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       (the strip is idempotent, so `Check` is unaffected); a `>` line inside a shell transcript
       is not a quotation. Runs of bare `>` markers carry no text and are not returned.
       src: exegesis quotecheck (2026-08-07)
-- [ ] `skilllens` — **the three SkillLens quality dimensions, promoted on the 2nd consumer
-      rule. This one is overdue: both consumers already exist and have already diverged.**
+- [x] `skilllens` — **the three SkillLens quality dimensions, promoted on the 2nd consumer
+      rule.** DONE (2026-08-08).
       The dimensions come from `microsoft/SkillLens`
       (`data/meta_skills/quality_rubric_3dim.md`, arXiv:2605.23899) — failure-mechanism
       encoding, actionable specificity, and a high-risk action blacklist, each validated at
@@ -269,6 +269,30 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       Consumers on landing: skillsaw dims 3/5/9 and adh `failure-handling`/`boundary-section`
       (both delete a private copy), then exegesis's proposed `--check skilllens` tier and
       canonizer's `verify.Specificity` — see those TODOs.
+      **Shape as landed.** `FailureMechanisms`, `SofteningPhrases`, `BlacklistSections`,
+      each taking `*markdown.Doc` — a pointer, not the value the entry wrote: `Doc` is ~72
+      bytes of headers and `gocritic`'s hugeParam rejects it, and skillsaw already passes a
+      pointer throughout.
+      **`Span` carries a `Kind`, which the entry did not specify and the detectors demand.**
+      dim 3 counts inline `if X fails` branches *and* sections named for failure, weighing
+      them differently, so one call returns both and a caller that could not tell them apart
+      could not reproduce the existing score. `Span.Units` travels with a section span
+      because the substance threshold is policy, not detection: skillsaw requires a boundary
+      section to out-weigh the body it sits in, adh does not. Same reason these return
+      evidence rather than `finding.Diagnostic`.
+      The three vocabularies are exported as **functions** returning a fresh slice, so
+      skillsaw's `Config` can source them without an exported slice becoming shared mutable
+      state one consumer edits under the others (mutation-tested).
+      **Equivalence proved, not assumed:** the new detectors and verbatim copies of
+      skillsaw's private ones were run over the real 233-skill corpus and agree on all four
+      counts for every skill — **233 compared, 0 mismatches**. A promotion that silently
+      changed what is detected would have moved every dim-3/5/9 score in the tree.
+      Found while testing, and left as-is because it is the existing behaviour: the failure
+      vocabulary is literal, not lemmatised — `timeout` is listed, so "the API times out"
+      reads as no mechanism. Recorded in the tests rather than fixed, since changing it here
+      would break the equivalence this promotion depends on.
+      Consumers can now delete their copies: skillsaw dims 3/5/9 and adh
+      `failure-handling`/`boundary-section`, after the next release.
       src: skillsaw `internal/rubric` + adh `internal/rubric` (2026-08-08); analysis in
       `~/Documents/agent-orange/skillopt_changes_findings.md`
 
