@@ -200,7 +200,7 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       the offending book skill went 3 diagnostics → 2.  (2026-08-06)
 - [x] `redlines` — book2skill Quality Red Lines: `MaxQuoteWords`, `Check(s)→[]finding.Diagnostic` (six RIA-TV++ segments, quotation ceiling, description states a trigger). Deliberately **separate from `speclint`**: speclint encodes the agentskills.io spec and moves when the spec moves; the red lines encode book2skill's house rules and move when the methodology moves. Messages moved verbatim from exegesis so its CLI tests pass unchanged.  src: exegesis internal/lint (promoted 2026-08-06); 2nd consumer skillsaw, wired (`internal/edit`, `preflight --redlines`) — verified 2026-08-08
 - [x] `speclint` — agentskills.io frontmatter spec: `DescriptionMaxRunes`, `AllowedFrontmatterKey`, `Frontmatter(s)→[]finding.Diagnostic`. Single source of truth so exegesis (gates the findings) and skillsaw (scores the cap) can't drift by hand. Name-format policy stays per-tool (exegesis=folder, skillsaw=kebab).  src: exegesis lint + skillsaw rubric (de-duplicated 2026-08-03)
-- [ ] `speclint` — **the allowlist did not match the spec; corrected 2026-08-08, needs a tag.**
+- [x] `speclint` — **the allowlist did not match the spec; corrected and released as v0.12.0 (2026-08-08).**
       Checked against <https://agentskills.io/specification>: the defined keys are `name`,
       `description`, `license`, `compatibility`, `metadata`, `allowed-tools`.
       `AllowedFrontmatterKey` admitted four of them and **rejected `license`, `compatibility`
@@ -212,10 +212,14 @@ Pinned to the originals' versions: `goccy/go-yaml@v1.19.2`, `yuin/goldmark@v1.8.
       `author` and `version` are **not** top-level keys at any level of the spec — its own
       example carries both inside `metadata` — and the merge-skills doc and template that
       claimed otherwise are corrected.
-      Widening can only *reduce* findings, so no consumer newly fails. **To release:** tag,
-      then `go get` in exegesis and skillsaw. Two consequences worth watching: `metadata`
-      values are string-only and nothing checks that yet, and merge-skills' retirement
-      Option 3 (`metadata: {superseded-by: …}`) stops needing a new key here.
+      Widening can only *reduce* findings, so no consumer newly fails — verified rather than
+      asserted: exegesis and skillsaw are both bumped to v0.12.0 with their suites green, and
+      a skill carrying `license:` + `metadata:` goes from two `disallowed key` errors to
+      `ok`. **0 skills in `books/` use the three keys; 15 of the installed skills do**, so the
+      corpus this repo gates was unaffected and the corpus an agent actually loads was not.
+      Two consequences worth watching: `metadata` values are string-only and nothing checks
+      that yet, and merge-skills' retirement Option 3 (`metadata: {superseded-by: …}`) stops
+      needing a new key here.
 - [x] `redlines` — **export `Quotes(body) []string`** so `exegesis quotecheck` can locate the
       same blockquote runs the `MaxQuoteWords` red line counts. Extraction was fused into
       `checkQuotes`; it is now one definition with two users. Exported from `redlines` rather
