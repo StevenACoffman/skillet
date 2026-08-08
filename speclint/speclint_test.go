@@ -11,12 +11,17 @@ import (
 )
 
 func TestAllowedFrontmatterKey(t *testing.T) {
-	for _, k := range []string{"name", "description", "tags", "allowed-tools"} {
+	// The spec's own set, plus the documented `tags` deviation.
+	for _, k := range []string{
+		"name", "description", "license", "compatibility", "metadata", "allowed-tools", "tags",
+	} {
 		if !speclint.AllowedFrontmatterKey(k) {
 			t.Errorf("AllowedFrontmatterKey(%q) = false, want true", k)
 		}
 	}
-	for _, k := range []string{"", "Name", "author", "license", "tools"} {
+	// `author` and `version` are the two most commonly assumed keys and are not in
+	// the spec at any level — the spec's own example carries them inside `metadata`.
+	for _, k := range []string{"", "Name", "author", "version", "tools", "id", "type"} {
 		if speclint.AllowedFrontmatterKey(k) {
 			t.Errorf("AllowedFrontmatterKey(%q) = true, want false", k)
 		}

@@ -28,9 +28,25 @@ var reAngle = regexp.MustCompile(`[<>]`)
 
 // AllowedFrontmatterKey reports whether k is a spec-permitted top-level
 // frontmatter key.
+//
+// The set is the one https://agentskills.io/specification defines: `name` and
+// `description` required, `license`, `compatibility`, `metadata` and
+// `allowed-tools` optional. Checked against the published table 2026-08-08,
+// which corrected three keys this rejected — a skill declaring its license was
+// being told the key does not exist.
+//
+// `tags` is the one deliberate deviation: the spec does not define it, but it is
+// the most-used key across the family's corpora (163 of the installed skills, and
+// every book2skill output), so rejecting it would report a defect on nearly every
+// skill in existence rather than describe one. Anything genuinely outside the spec
+// belongs under `metadata`, which the spec provides for exactly that — including
+// `author` and `version`, which are *not* top-level keys however often they are
+// assumed to be.
 func AllowedFrontmatterKey(k string) bool {
 	switch k {
-	case "name", "description", "tags", "allowed-tools":
+	case "name", "description", "license", "compatibility", "metadata", "allowed-tools":
+		return true
+	case "tags":
 		return true
 	default:
 		return false
