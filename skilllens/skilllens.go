@@ -158,17 +158,91 @@ func proseSpans(d *markdown.Doc, re *regexp.Regexp) []Span {
 	return spans
 }
 
-// sectionSpans returns one span per section whose title contains any of the terms.
+// sectionSpans returns one span per section whose title matches any of the terms.
+//
+// Matching is by matchesSignal, not plain substring: an ASCII term must begin at a word
+// boundary and its regular English inflections count, so "boundary" matches the standard
+// book2skill "## B — Boundaries" heading (a plain Contains misses it, since "boundary"
+// is not a substring of "boundaries") while "red flag" does not match "requi[red flag]s".
 func sectionSpans(d *markdown.Doc, terms []string) []Span {
 	var spans []Span
 	for _, sec := range d.Sections {
 		title := strings.ToLower(sec.Title)
 		for _, term := range terms {
-			if strings.Contains(title, strings.ToLower(term)) {
+			if matchesSignal(title, strings.ToLower(term)) {
 				spans = append(spans, Span{Kind: KindSection, Text: sec.Title, Units: sec.Units})
 				break
 			}
 		}
 	}
 	return spans
+}
+
+// matchesSignal reports whether s contains sig or a regular inflection of it (both
+// already lowercased). An ASCII signal must begin at a word boundary, so "red flag" does
+// not match "requi[red flag]s" (the "red" is mid-word). Append-only inflections already
+// match because the signal is a prefix of the longer word ("mistake" in "mistakes",
+// "troubleshoot" in "troubleshooting"); the one regular inflection a prefix match cannot
+// reach — a consonant+"y" pluralizing to "ies" — is probed explicitly, so "boundary"
+// matches "boundaries". Non-ASCII (CJK) signals have no word boundaries and match as
+// plain substrings.
+func matchesSignal(s, sig string) bool {
+	if !isASCII(sig) {
+		return strings.Contains(s, sig)
+	}
+	if matchesForm(s, sig) {
+		return true
+	}
+	if plural, ok := iesPlural(sig); ok {
+		return matchesForm(s, plural)
+	}
+	return false
+}
+
+// matchesForm reports whether form appears in s beginning at a word boundary.
+func matchesForm(s, form string) bool {
+	for idx := 0; ; {
+		p := strings.Index(s[idx:], form)
+		if p < 0 {
+			return false
+		}
+		p += idx
+		if p == 0 || !isWordByte(s[p-1]) {
+			return true // form starts at a word boundary
+		}
+		idx = p + 1
+	}
+}
+
+// iesPlural returns sig with a trailing consonant+"y" rewritten to "ies" — the regular
+// English plural that rewrites the stem (boundary->boundaries, policy->policies), which
+// a prefix match cannot reach. ok is false otherwise; a vowel+"y" ("day"->"days") is
+// append-only and already covered by matchesForm.
+func iesPlural(sig string) (plural string, ok bool) {
+	if len(sig) < 2 || sig[len(sig)-1] != 'y' || isVowel(sig[len(sig)-2]) {
+		return "", false
+	}
+	return sig[:len(sig)-1] + "ies", true
+}
+
+func isVowel(b byte) bool {
+	switch b {
+	case 'a', 'e', 'i', 'o', 'u':
+		return true
+	default:
+		return false
+	}
+}
+
+func isASCII(s string) bool {
+	for i := range len(s) {
+		if s[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
+}
+
+func isWordByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9')
 }
