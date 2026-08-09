@@ -87,6 +87,27 @@ func TestSofteningPhrasesAreBilingual(t *testing.T) {
 	}
 }
 
+func TestSectionMatchingHandlesPluralAndWordBoundary(t *testing.T) {
+	t.Parallel()
+	// The standard book2skill B segment is titled "Boundaries" (plural); "boundary" must
+	// match it via its ies-plural, which a plain substring test misses ("boundary" is not
+	// a substring of "boundaries"). This is the case that moved ~30 skills' scores when
+	// skilllens used plain Contains where skillsaw's rubric used an inflecting matcher.
+	plural := markdown.Parse("## B — Boundaries and Blind Spots\n\n- don't do this\n- or this\n")
+	if n := count(skilllens.BlacklistSections(plural), skilllens.KindSection); n != 1 {
+		t.Errorf("plural 'Boundaries' heading: BlacklistSections = %d, want 1", n)
+	}
+	if n := count(skilllens.FailureMechanisms(plural), skilllens.KindSection); n != 1 {
+		t.Errorf("plural 'Boundaries' heading: FailureMechanisms section = %d, want 1", n)
+	}
+	// An ASCII term must begin at a word boundary: "red flag" must not match the "red" in
+	// "Required" followed by the "flag" in "flags".
+	midword := markdown.Parse("## Required Flags Reference\n\n- a\n- b\n")
+	if n := count(skilllens.BlacklistSections(midword), skilllens.KindSection); n != 0 {
+		t.Errorf("'Required Flags' must not match 'red flag' mid-word: got %d", n)
+	}
+}
+
 func TestBlacklistSectionsCarryTheirUnits(t *testing.T) {
 	t.Parallel()
 	// The substance threshold is the caller's policy, so the count travels with the span
