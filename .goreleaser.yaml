@@ -1,3 +1,7 @@
+# Make sure to check the documentation at https://goreleaser.com
+
+# The lines below are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/need to use them.
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
 # This is a Go *library*: there are no binaries to build. This release
@@ -11,8 +15,13 @@
 #              `id-token: write` for keyless signing.
 
 version: 2
-
-project_name: skillet
+# Consider pinning your project name:
+# GoReleaser will attempt to resolve the project name with this precedence:
+#  1. explicit project_name — wins
+#  2. git remote / release repo name — beats go.mod
+#  3. go.mod module basename — used when there's no remote
+#  4. directory name — never observed; go.mod took precedence over it even with no remote
+# project_name: PIN_YOUR_PROJECT_HERE
 
 before:
   hooks:
