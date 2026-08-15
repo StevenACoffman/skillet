@@ -30,6 +30,19 @@ var (
 // Every returned Check is backed by an unambiguous cue in expected; it returns
 // nil (not a wrong guess) when nothing is inferable, and the result is
 // de-duplicated and stably ordered for identical input.
+//
+// Do not expect this to cover a corpus, and do not widen it to make it. Measured
+// 2026-08-15 over 1284 real behavioral Expected strings: **none** carried any cue
+// below, 1% held a backticked span, and 15% were the single word "invoke". Those
+// strings are prose written for a human judge -- "a single generic decodeValid[T
+// Validator] helper" appears with no markup at all -- so there is nothing to read.
+//
+// The tempting widening is a contains check over identifier-shaped tokens, which
+// would reach about a fifth of that corpus. It is wrong for the reason stated above:
+// a CamelCase word inside prose is not an assertion that the output must contain that
+// literal string, so the check fails a correct answer. That lowers the base of the
+// dimension it feeds, which is the heaviest in skillsaw's rubric. Returning nothing
+// is the honest answer; a manufactured false negative is not.
 func DeriveChecks(expected string) []judge.Check {
 	var checks []judge.Check
 	seen := map[judge.Check]bool{}
