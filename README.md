@@ -73,12 +73,16 @@ Each package does one job and depends on little. Take only what you need.
 
 ### Skills and Markdown
 
-| Package      | Purpose                                                                                                                                                      |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `skill`      | Load and parse Agent Skills (`SKILL.md`): frontmatter plus Markdown body.                                                                                    |
-| `markdown`   | Structured view of a skill body via goldmark (headings, fences, lists, tables).                                                                              |
-| `speclint`   | Validate `SKILL.md` frontmatter against the agentskills.io spec (description cap, allowed keys). The single source of truth for the spec's drift-prone data. |
-| `neutrality` | Red-light scan that flags runtime-binding wording, so a skill installs in any runtime.                                                                       |
+| Package       | Purpose                                                                                                                                                                                         |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `skill`       | Load and parse Agent Skills (`SKILL.md`): frontmatter plus Markdown body.                                                                                                                       |
+| `markdown`    | Structured view of a skill body via goldmark (headings, fences, lists, tables).                                                                                                                 |
+| `speclint`    | Validate `SKILL.md` frontmatter against the agentskills.io spec (description cap, allowed keys). The single source of truth for the spec's drift-prone data.                                    |
+| `neutrality`  | Red-light scan that flags runtime-binding wording, so a skill installs in any runtime.                                                                                                          |
+| `frontmatter` | Split a leading `---` YAML block from the Markdown body. Normalizes CRLF, so a caller that forgets to cannot get an empty header instead of an error.                                           |
+| `redlines`    | book2skill's mechanical Quality Red Lines: the six RIA-TV++ segments, the per-quotation word ceiling, and a description that states its trigger.                                                |
+| `skilllens`   | The three SkillLens quality detectors — failure mechanisms, softening phrases, blacklist sections — returning located evidence rather than diagnostics, so each consumer sets its own severity. |
+| `timeseries`  | Detect a regression against a rolling baseline rather than a fixed threshold.                                                                                                                   |
 
 ### Rulesets and the Distillation Pipeline
 
