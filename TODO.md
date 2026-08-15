@@ -420,6 +420,61 @@ not yet tracked elsewhere.
   **provisional** in their package docs (discoverable via `go doc`), and kept — not deleted. Exit
   criteria recorded there: `auditlog` earns the "shared" designation on a 2nd consumer; `provenance`
   should be deleted if it is still unused at the next survey rather than carry unused public surface.
+- [x] **A derived applicability predicate — "does this document execute anything?"** DONE
+  (2026-08-14) as **`markdown.Doc.HasCodeBlock`**, not a `skilllens` function. Writing the
+  interface comment first showed the entry's placement was wrong for two independent reasons.
+  **The evidence does not survive the parse:** `Doc.Prose` has code blocks *blanked* and
+  `Doc.Links` keeps only code-span *contents*, so a `skilllens` predicate taking a `*Doc`
+  cannot see a fenced block at all — it would have to re-parse the body, a second parser for
+  a fact the first one already had. And once `markdown` records it, any
+  `skilllens.Executes(d) { return d.HasCodeBlock }` is a **pass-through method**, which §4
+  prohibits outright. `hasOrderedList` is the exact precedent: one `ast.Walk`, a bool on
+  `Doc`, in the package that already owns "what is in this document".
+  **Bool, not a count.** Nothing thresholds on *how many* code blocks; a count would invite a
+  threshold nobody has calibrated. **Named for the fact, not the conclusion** — `Executes` is
+  a skill-domain reading of the fact, and `markdown` does not know what a skill is.
+  **Inline code spans deliberately do not count**: naming `foo` in backticks demonstrates
+  nothing runnable, and counting spans would make nearly every prose document look
+  executable. That is the one way this could be quietly wrong, so it has its own test and a
+  mutation case.
+  Verified over the 233-skill corpus: `HasCodeBlock` agrees with an independent scan on
+  **233/233**, and 5 mutations (count code spans, drop indented, drop fenced, always-false,
+  stop at top level) were all caught, each behind a build gate.
+  **The corpus check corrected the measurement that motivated this.** Two earlier scans were
+  wrong in the same way — a `^```` regex misses a fence indented inside a list item, which is
+  common here — and the first probe parsed frontmatter as body. Re-measured properly:
+  **154 of 233 skills (66%) have zero inline failure branches**, and gating a `units > 3`
+  deduction cuts the docked set **36 → 26, suppressing 10**, not the 14 first recorded. The
+  consumers' TODOs carry the corrected figures.
+  No consumer scoring changed here, no `skilllens` change, and no `Applicability` type: this
+  ships the fact, and adh and skillsaw decide policy against their own corpora.
+- Superseded framing (kept for the argument, which still holds):
+  **A derived applicability predicate for `skilllens` — "does this document execute anything?"**
+  Surfaced by a 2026-08-09 survey of how the family handles checks that are a category error for some
+  document kinds. The `skilllens` section detectors match on heading *title* (`"boundary"` is in both
+  `FailureSectionTitles()` and `BlacklistTitles()`), so a bare `## B — Boundaries` heading satisfies
+  them with nothing underneath. Measured over the 233-skill corpus: **144 skills (62%) have zero
+  inline failure branches and pass on the heading alone.** Tightening that is only safe if the
+  tightened check can be suppressed for documents that legitimately encode no failure mechanism.
+  **Four consumers already need the same predicate**, which is what earns the promotion rather than a
+  fourth private copy: adh's `KeyFailure` (weight 20) and `KeyBoundary` (weight 15) — neither
+  `NeedsJudge`, so 35 points with no human backstop — and skillsaw's dim 3 and dim 4 (230 skills
+  flagged "judge if this skill type needs them"). This is the same 2nd-consumer argument that promoted
+  `skilllens` itself.
+  Shape: a pure predicate over an already-parsed `*markdown.Doc`, matching the rest of the package —
+  evidence out, policy left to the caller. Derived from content (any fenced code block), **not read
+  from frontmatter**: a declared `category:` is a self-report written by the same generator being
+  measured, letting a document opt out of its own worst dimension. The corpus has no type field today.
+  Validated on the corpus: gating a `units > 3` deduction cuts the docked set from 34 to 20 and
+  suppresses exactly the 14 zero-fence decision skills (`grpc-vs-rest-vs-graphql`,
+  `ml-simplest-model-baseline-first`) while still docking CLI wrappers — `gh-cli` has 87 shell blocks
+  and 0 failure branches, which is the defect the dimension exists to catch, not a category error.
+  **Do not generalize further than this.** The family currently mitigates the same problem four
+  different ways — a derived gate (`redlines.checkTrigger`'s `FrontmatterErr == nil`), a manual
+  opt-in flag (`--check redlines`), a defer-to-judge flag (skillsaw dims 4/9), and an advisory
+  severity (`canonizer verify.Specificity`). Those differ enough that a general `Applicability`
+  mechanism now would be special-purpose code wearing a general name. Promote the one predicate that
+  has repeated; leave the four gate styles alone until a shape repeats.
 
 ## Domain Model
 
