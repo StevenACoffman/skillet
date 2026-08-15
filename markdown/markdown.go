@@ -30,6 +30,7 @@ type Doc struct {
 	Prose          string   // body text with code blocks and code spans blanked
 	Links          []string // link destinations and code-span contents (ref candidates)
 	HasOrderedList bool
+	HasCodeBlock   bool // a fenced or indented code block, never an inline code span
 }
 
 // Parse parses a Markdown body. It is pure: same input, same Doc. GFM is enabled
@@ -44,6 +45,7 @@ func Parse(body string) *Doc {
 		Prose:          prose(root, src),
 		Links:          links(root, src),
 		HasOrderedList: hasOrderedList(root),
+		HasCodeBlock:   hasCodeBlock(root),
 	}
 }
 
@@ -111,6 +113,31 @@ func hasOrderedList(root ast.Node) bool {
 	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if entering {
 			if l, ok := n.(*ast.List); ok && l.IsOrdered() {
+				found = true
+				return ast.WalkStop, nil
+			}
+		}
+		return ast.WalkContinue, nil
+	})
+	return found
+}
+
+// hasCodeBlock reports whether the document contains a block-level code block,
+// fenced or indented.
+//
+// An inline code span is deliberately not one: a document that merely names `foo`
+// in backticks demonstrates nothing runnable, and counting spans would make almost
+// every prose document look executable.
+//
+// What a caller concludes from this is the caller's own: skillsaw and adh read it as
+// "this artifact executes something, so a missing failure mechanism is a defect
+// rather than a category error", but that reading is theirs, not this package's.
+func hasCodeBlock(root ast.Node) bool {
+	found := false
+	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if entering {
+			switch n.Kind() {
+			case ast.KindFencedCodeBlock, ast.KindCodeBlock:
 				found = true
 				return ast.WalkStop, nil
 			}
