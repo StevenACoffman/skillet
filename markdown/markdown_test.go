@@ -66,3 +66,31 @@ func TestParseUnorderedListIsNotOrdered(t *testing.T) {
 		t.Error("unordered list reported as ordered")
 	}
 }
+
+func TestParseHasCodeBlock(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		body string
+		want bool
+	}{
+		"fenced":   {"Run it:\n\n```sh\nls -l\n```\n", true},
+		"indented": {"Run it:\n\n    ls -l\n", true},
+		// The distinction the whole field turns on. Consumers read this as "the artifact
+		// executes something"; naming `foo` in backticks demonstrates nothing runnable, and
+		// counting spans would make nearly every prose document look executable.
+		"code span alone is not a block": {"Call `Parse` on the body, then read `Prose`.\n", false},
+		"prose only":                     {"## Boundary\n\n- do not do this\n", false},
+		"empty":                          {"", false},
+		// A fence nested in a list item is still a code block; the walk must not stop at
+		// the top level of the tree.
+		"fenced inside a list item": {"1. first:\n\n   ```go\n   x := 1\n   ```\n", true},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := markdown.Parse(tc.body).HasCodeBlock; got != tc.want {
+				t.Errorf("HasCodeBlock = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
