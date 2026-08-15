@@ -475,6 +475,25 @@ not yet tracked elsewhere.
   severity (`canonizer verify.Specificity`). Those differ enough that a general `Applicability`
   mechanism now would be special-purpose code wearing a general name. Promote the one predicate that
   has repeated; leave the four gate styles alone until a shape repeats.
+- [ ] **DECISION: the exit condition above may now be met — a fifth way has appeared.**
+  That note said to wait "until a shape repeats". `exegesis/TODO.md` records a fifth answer to
+  "does this check apply to this document", from `coherence`'s `OrphanEndpoints` meter: a
+  `Convention bool`, true only when the current graph contains any `verifies` edge — proof the
+  repo actually uses the pattern being checked — which skips score-based promotion when false.
+  **It is derived from the corpus rather than declared, judged, or opted into**, which puts it in
+  the same family as `markdown.Doc.HasCodeBlock` and not in the same family as the other four.
+  So the question is now answerable rather than deferred: two of the five (`HasCodeBlock`,
+  `Convention`) share a shape — *derive a predicate from the artifact or its corpus, then suppress
+  the deduction* — and three do not (a manual flag, a defer-to-judge flag, an advisory severity),
+  because those three are about **who decides**, not about whether the check applies.
+  Do not answer it by generalizing over all five. The honest options are: name the two-member
+  family and give it a type, or note that two members is still not a mechanism and wait. The
+  second is defensible; what is not defensible is leaving the note's exit condition unevaluated
+  now that something has tripped it.
+  Related and already settled, so do not re-derive it: skillsaw records **gate on the artifact,
+  flag on the inputs** — dim 3 is a category error and gets a suppressing predicate; dim 8 is
+  missing input and gets a flag with nothing suppressed. Any `Applicability` type must not blur
+  those, because a category input for dim 8 would launder unfinished work as inapplicable.
 
 ## Domain Model
 
@@ -526,3 +545,134 @@ already owns.
   significance handling (a hardcoded `p=0.05` placeholder, no held-out split) is weaker
   than `stats`. Only the calibration math (and a few isolated algorithms, noted in the
   consumer TODOs) are worth lifting.
+
+## Contradiction Detection — Knowledge-Base Ingestion (Agent-Red Survey, 2026-08-15)
+
+Source: a survey of `~/Documents/agent-red` (26 agent-tooling projects) against the
+knowledge-base ingestion gap — taking in outside sources and accreting domain knowledge
+without polluting the corpus with contradictory or low-quality material. The finding that
+matters here holds across all 26: **every one of them detects similarity; none adjudicate
+conflict.** llmwiki surfaces contradictions, mnemon deduplicates, coherence finds broken
+support links — nothing decides which of two conflicting claims is authoritative, or
+records why.
+
+The family already owns both halves that bracket the gap. `ruleset` carries the typed
+normative form (§, MUST/SHOULD/CONSIDER, CODE/ARCH/METHOD, `SourceAnchor`); `finding`
+carries the verdict shape. What is missing is the comparison of one rule against another,
+and it belongs here rather than in a consumer for the usual reason: **canonizer needs it to
+certify that a ruleset is internally consistent** — which is the base rules' entire claim —
+and **merge-skills needs the same comparison read the other way.** Convergence and
+divergence are one predicate over one pair, not two implementations. The 2nd-consumer bar is
+met before the knowledge-base tool exists at all.
+
+- [x] **`ruleset/conflict` — decidable inconsistencies between two rules, as findings.** DONE
+  2026-08-15. Three predicates, no tunable constant: severity divergence, level divergence,
+  section-identity collision. Emits `finding.Diagnostic` with **severity left unset** — whether
+  a divergence blocks is canonizer's policy, and a package deciding it here would be the ship
+  threshold this repo refuses, one level down. Pinned by `TestFindAssignsNoSeverity`.
+  Severity and level divergence are found in one pass because both key on the same grouping —
+  rules that say the same thing — and splitting them would let the two drift apart on what
+  "the same statement" means.
+  Original entry:
+  Pure, over already-parsed `[]ruleset.Rule`; evidence out, policy to the caller, matching
+  `neutrality.Scan` and the `skilllens` detectors. Emits `finding.Diagnostic`, **never a
+  score** — canonizer's charter is findings-based precisely so no threshold can become a
+  ship gate, and a "contradiction score" would be that threshold wearing a different name.
+  Three predicates are decidable over the canonical form as it stands today, and each is
+  exact — no tunable constant anywhere in them:
+  (a) **Severity divergence** — two rules whose normalized text is equal but whose
+  `Severity` differs (the same rule asserted `MUST` here and `CONSIDER` there). Real,
+  common when two sources are distilled independently, and currently invisible.
+  (b) **Level divergence** — the same equality with differing `Level` (CODE vs ARCH vs
+  METHOD), which means two rulesets disagree about what kind of thing the rule governs.
+  (c) **Section-identity collision** — two rules claiming one `§` in a merged ruleset.
+  Not a semantic contradiction but a *provenance* one: after a merge, `↦` anchors and
+  `CONTRACT:`-style references resolve to whichever copy won. rebar (`agent-red/rebar`)
+  documents the same failure from the other end — numbered identifiers collide on merge,
+  renumbering breaks every reference, and the number means nothing across repos. Worth
+  catching mechanically since we cannot adopt their fix (our § numbering is load-bearing
+  in the canonical form).
+  Equality throughout is `textnorm.Fold`-normalized, **not** byte equality — see the
+  promotion item below. Case is preserved, per that package's existing decision.
+- [ ] **Prerequisite, not a shortcut: the canonical form has no subject slot.** The
+  conflicts worth the most — two `MUST` rules constraining the same named quantity to
+  disjoint intervals, or the same slot to disjoint enumerations — are decidable by
+  interval and set arithmetic with no judgment and no constants. We cannot compute them,
+  because `§1.1 [MUST][CODE] Always close what you open.` carries its subject only as
+  prose. Adding a structured subject/quantity slot to `ruleset` is a canonical-form change
+  that breaks `Render`/`Parse` round-trip and every stored ruleset, so it is **its own
+  decision**, recorded here rather than smuggled in under contradiction detection. Do not
+  approximate it: extracting a subject from prose by pattern would put an uncalibrated
+  heuristic underneath a blocking gate, which is the exact shape rejected in the
+  unified-thinking survey above.
+- [ ] **Deliberately NOT built: near-duplicate and semantic-similarity detection.** The
+  obvious next detector — "these two rules are 0.87 similar, probably in conflict" —
+  requires a threshold nobody has calibrated, over an embedding or an edit distance,
+  gating adoption. That is the same defect as unified-thinking's bias detectors and it is
+  refused for the same reason. Semantic contradiction between two rules that survive the
+  decidable predicates is **judge work**, relayed through the existing prompt-filler
+  boundary: canonizer already emits a cold-critic prompt that sees the source and the
+  ruleset but never the reasoning that produced them, and its findings already come back
+  as `finding.Diagnostic`. The residue routes there; nothing new is needed in skillet for
+  it.
+- [ ] **Adjudication is a distinct artifact from detection, and has no type yet.** When two
+  rules conflict and a human picks one, the decision is knowledge present in neither source
+  — so it can carry no `↦` anchor and **fails `verify.Provenance` by construction.** That
+  is the highest-value thing the team produces and the corpus has nowhere to put it. Shape,
+  when a second consumer wants it: a supersession edge (`supersedes`, plus the warrant —
+  who, when, which review) beside `SourceAnchor` in `ruleset`, so an adjudicated rule is
+  *sourced differently*, not *unsourced*. Hold until the knowledge-base tool is real; one
+  prospective consumer is not evidence for a type.
+- [x] **`finding.Diagnostic` needs a who-acts axis.** DONE 2026-08-15: `Action` with
+  `automatic` / `guided` / `human`, orthogonal to `Severity` and documented as such, since the
+  whole risk is a reader collapsing them.
+  **The zero value is the unclassified state and there is deliberately no `ActionUnknown`.**
+  "Nobody classified this" is not the claim "a human is required" — same distinction
+  `timeseries.Verdict.Compared` keeps — and a named constant invites being set deliberately.
+  Incidental find: `Result.Add` has **zero callers anywhere in the family**, so taking a
+  pointer to satisfy `hugeParam` broke nothing. `finding.Result` itself has 19 callers in
+  canonizer, so the type stays; the unused method is worth a look at the next survey.
+  Original entry: Two repos ask for the same thing independently, which is the promotion bar:
+  `canonizer/TODO.md` wants it because `loop` and `budget` govern rework rounds — "a rework
+  budget spent on findings a human must adjudicate is not the same expenditure as one spent on
+  findings the agent can close, and today the two are indistinguishable to the loop" — and
+  `skillsaw/TODO.md` wants it because `skillsaw-skill` picks one edit per round, so "is this
+  finding safe to apply unattended" is a decision the loop is **already making implicitly**.
+  `Diagnostic` is `{Severity, Category, Path, Message}` and lives here, so either it gains the
+  axis once or the two consumers invent incompatible vocabularies for it. Severity already
+  answers *does this block*; nothing answers *who acts*.
+  Prior art in both entries: `AgentLint`'s `fix_type` (`guided` — tool proposes, human
+  confirms; `assisted` — tool can generate the fix) and `agentsys`' HIGH/MEDIUM/LOW meaning
+  safe-to-auto-fix / needs-context / needs-human-judgment.
+  **Not a severity change**, which canonizer states explicitly: `Specificity` stays advisory.
+  A fixed classification per check, no new measurement. The axes are orthogonal — a blocking
+  finding may be safely auto-fixable, and an advisory one may need a human.
+- [x] **Promote `textnorm` from exegesis.** DONE 2026-08-15. `quotecheck` is **not** promoted:
+  its 2nd consumer is the knowledge-base ingestion tool, which does not exist yet.
+  Verified byte-identical over the 233-skill corpus before exegesis switched — 0 mismatches —
+  because a promotion that silently altered normalization would move every `quotecheck`
+  verdict in the tree. exegesis now imports it and its copy is deleted; canonizer adopting it
+  is that repo's commit.
+  It had **no tests upstream**, which is not acceptable for a shared-kernel package; written
+  now, pinning whitespace folding, each typographic class, case preservation, and the
+  canonizer disagreement itself.
+  `staticcheck` then proved the package doc's own point: it proposed rewriting the
+  zero-width-space case to `{"ab", "ab"}` — passing, testing nothing — because the character
+  is invisible in source. The escapes are deliberate; do not "simplify" them.
+  Original entry: `textnorm.Fold`
+  already folds whitespace runs and typographic variants for two exegesis guards that must
+  not disagree (`quotecheck`, `a2check`); `ruleset/conflict` is the third caller and the
+  first outside that repo. `quotecheck` is the stronger find: it is the family's
+  **fabrication guard** — does this run of words appear in the source at all — and it is
+  the same trust property llmwiki enforces, in a better form. llmwiki validates a
+  *byte-exact* substring against the live source (`llmwiki/internal/db/db.go` stores only
+  `content_hash`, never the bytes), so a curly apostrophe or a rewrapped line fails it, and
+  a moved source makes it unverifiable. `quotecheck` folds first and drops passages under
+  `MinPassageWords`, which is why it survives contact with a real corpus. The
+  knowledge-base ingestion tool is `quotecheck`'s 2nd consumer; that is what earns the
+  promotion, not the survey.
+- Note for whoever picks this up: pair comparison is O(n²) and that is fine. The corpus is
+  233 skills; a ruleset is tens of rules. Do not build a candidate index until a
+  measurement says the quadratic hurts — `skillex` (`agent-red/skillex`) is the reference
+  design if one is ever needed, but an index bought on speculation is a second source of
+  truth about which pairs exist.
