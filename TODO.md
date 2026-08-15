@@ -475,7 +475,18 @@ not yet tracked elsewhere.
   severity (`canonizer verify.Specificity`). Those differ enough that a general `Applicability`
   mechanism now would be special-purpose code wearing a general name. Promote the one predicate that
   has repeated; leave the four gate styles alone until a shape repeats.
-- [ ] **DECISION: the exit condition above may now be met — a fifth way has appeared.**
+- [ ] **DECIDED 2026-08-15: the exit condition IS met — name the two-member family.**
+  The shape to name is the one `HasCodeBlock` and `Convention` share: **derive a predicate
+  from the artifact or its corpus, then suppress the deduction.** The other three answers
+  (manual flag, defer-to-judge flag, advisory severity) are about *who decides* and stay
+  out of it — a type covering all five would be the general name over special-purpose code
+  the original note warned against.
+  Constraint from skillsaw, already settled, which the type must not blur: **gate on the
+  artifact, flag on the inputs.** Dim 3 is a category error and gets a suppressing
+  predicate; dim 8 is missing input and gets a flag with nothing suppressed. An
+  `Applicability` that could express dim 8 would launder unfinished work as inapplicable.
+  Shape and consumers still to settle. Original framing:
+  **The exit condition may now be met — a fifth way has appeared.**
   That note said to wait "until a shape repeats". `exegesis/TODO.md` records a fifth answer to
   "does this check apply to this document", from `coherence`'s `OrphanEndpoints` meter: a
   `Convention bool`, true only when the current graph contains any `verifies` edge — proof the
