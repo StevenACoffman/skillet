@@ -605,7 +605,23 @@ met before the knowledge-base tool exists at all.
   in the canonical form).
   Equality throughout is `textnorm.Fold`-normalized, **not** byte equality — see the
   promotion item below. Case is preserved, per that package's existing decision.
-- [ ] **Prerequisite, not a shortcut: the canonical form has no subject slot.** The
+- [ ] **DEFERRED 2026-08-15 with a trigger: the canonical form has no subject slot.**
+  Decision: do not build it yet, and do not approximate it. **The value side had never been
+  measured, and it measures zero.** The only real corpus is
+  `go-advice/Sources/command_rules.md` (24 rules); everything else is a 1-4 rule prompt
+  example. **Not one of the 24 constrains a named quantity to an interval or an
+  enumeration** — they are structural imperatives ("do not use `init()` to register
+  commands", "export exactly one symbol", "return `error` from every command execution
+  function"). The conflicts this slot would decide have no instance anywhere in the family.
+  **Trigger to revisit: a ruleset whose rules constrain named quantities** — SRE latency or
+  error budgets, config policy, resource limits. There the predicate fires immediately;
+  here it cannot fire at all. The rule class is real, the corpus for it is not, and a
+  feature whose only exercise is its own tests is how `provenance` ended up flagged for
+  deletion with zero consumers.
+  **It is also blocked on the format item below**, which is owed by the first new marker
+  whatever it is, and which is cheap now and dearer with every ruleset written.
+  Original entry:
+  **Prerequisite, not a shortcut: the canonical form has no subject slot.** The
   conflicts worth the most — two `MUST` rules constraining the same named quantity to
   disjoint intervals, or the same slot to disjoint enumerations — are decidable by
   interval and set arithmetic with no judgment and no constants. We cannot compute them,
@@ -616,6 +632,22 @@ met before the knowledge-base tool exists at all.
   approximate it: extracting a subject from prose by pattern would put an uncalibrated
   heuristic underneath a blocking gate, which is the exact shape rejected in the
   unified-thinking survey above.
+- [ ] **The canonical form cannot gain an optional field safely — fix this before adding
+  one.** Found while weighing the subject slot, and independent of whether that is ever
+  built: **an unknown marker line is folded into `Rationale` rather than rejected.**
+  Verified against v0.16.0 rather than read from the code — parsing a rule carrying a
+  hypothetical `⊕  timeout <= 30s` line yields
+  `Rationale: "because latency budgets ⊕  timeout <= 30s"`. No error, no marker, no way for
+  a reader to tell. So a file written by a newer version silently mis-parses in an older
+  one, and `Render`/`Parse` stops round-tripping across versions while appearing to work.
+  **`Parse` cannot simply be made strict**, and that is the whole difficulty:
+  `applyBody`'s `default` case *is* rationale continuation, so rejecting unknown indented
+  lines would reject the multi-line rationales the form is designed to carry. The fix has
+  to give continuation its own representation — an explicit marker, or a version line the
+  parser can refuse — before any new marker is introduced.
+  **Cheap now, dearer later.** There are roughly ten stored rulesets in the family and one
+  24-rule corpus; every ruleset written after this costs more to migrate. This is owed by
+  whatever optional field comes first, and the subject slot is only the one that asked.
 - [ ] **Deliberately NOT built: near-duplicate and semantic-similarity detection.** The
   obvious next detector — "these two rules are 0.87 similar, probably in conflict" —
   requires a threshold nobody has calibrated, over an embedding or an edit distance,
