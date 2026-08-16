@@ -648,6 +648,39 @@ met before the knowledge-base tool exists at all.
   **Cheap now, dearer later.** There are roughly ten stored rulesets in the family and one
   24-rule corpus; every ruleset written after this costs more to migrate. This is owed by
   whatever optional field comes first, and the subject slot is only the one that asked.
+  **DECIDED 2026-08-15 — the resolution is a format version, shipped alone and first.**
+  **Scope first, because it makes the cost small: this is the `ruleset` canonical form, not
+  `SKILL.md`.** Its only consumers are canonizer and skillet itself — exegesis, skillsaw and
+  adh have zero references — and there are roughly ten stored files, most of them 1-4 rule
+  prompt examples. No external spec governs it, so a version means whatever skillet says.
+  A breaking change here is a canonizer bump, not a family migration. `SKILL.md` needs none
+  of this: agentskills.io owns its shape, it already has YAML frontmatter, `speclint`
+  validates the key set rather than folding unknown content into a neighbouring field, and
+  the spec reserves `metadata` for client-specific keys — a `format:` key there would be a
+  spec violation.
+  **The version is what makes strictness affordable, which is the point.** Today leniency
+  *is* the forward-compatibility mechanism, so `Parse` cannot reject an unknown line without
+  also rejecting rationale continuation. With a declared version those separate: across
+  versions the version check does the rejecting, and within a known version an unknown marker
+  can be a hard error, because the file has asserted which grammar it is written in.
+  **Placement: a YAML frontmatter block, via `skillet/frontmatter.Split`.** Compatibility
+  cannot decide this — **both placements were tested against v0.16.0 and both are silently
+  ignored**, since the header switch has no default for top-level lines and a YAML block
+  precedes any `§`. So choose on fit: `frontmatter` is already the family's metadata
+  convention, has a parser, is extensible without touching the rule grammar, and can absorb
+  the ad-hoc `Source:`/`Scope:` lines, which are unvalidated and cannot grow. A bespoke
+  `Format: 2` header line is smaller and would do, but leaves a second metadata mechanism.
+  **Sequencing, and step 1 is the one with a deadline:**
+  1. Ship the version *reader* alone, changing nothing else — parse the block, treat a
+     missing version as v1 so no stored file needs migrating, refuse an unknown major. Inert
+     on every existing file, and worthless the day it is needed if it did not ship a release
+     earlier.
+  2. Then make `Parse` strict within a known version, once rationale continuation has its own
+     representation.
+  3. Then any new marker, subject slot or otherwise, is an ordinary v2 addition.
+  **Caution:** a version field invites use. Reach for v2 when the grammar genuinely changes —
+  not to record provenance, tool identity or scoring metadata. That is how a format version
+  becomes a second manifest, and `identity.Hash` already pins which bytes produced what.
 - [ ] **Deliberately NOT built: near-duplicate and semantic-similarity detection.** The
   obvious next detector — "these two rules are 0.87 similar, probably in conflict" —
   requires a threshold nobody has calibrated, over an embedding or an edit distance,
