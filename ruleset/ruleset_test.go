@@ -41,6 +41,10 @@ func TestRenderParseRoundTrip(t *testing.T) {
 			},
 		},
 	}
+	// Parse resolves an undeclared file to version 1, so the fixture states it: a v1 ruleset
+	// is what this is, and leaving Format at 0 would make the round-trip compare a resolved
+	// value against an unset one.
+	rs.Format = 1
 	got, err := ruleset.Parse(ruleset.Render(rs))
 	if err != nil {
 		t.Fatalf("Parse(Render(rs)): %v", err)
