@@ -9,7 +9,20 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/goccy/go-yaml"
+
+	"github.com/StevenACoffman/skillet/frontmatter"
 )
+
+// FormatVersion is the canonical-form major version this package writes and is the
+// highest it can read. It is 1: adding the ability to declare a version changed no
+// grammar, so nothing needs re-writing.
+//
+// Bump it only when the grammar itself changes -- not to record provenance, tool identity
+// or scoring metadata. identity.Hash already pins which bytes produced what, and a format
+// version that accumulates those becomes a second manifest.
+const FormatVersion = 1
 
 // Severity is how strictly a Rule is enforced.
 const (
@@ -53,6 +66,11 @@ type Rule struct {
 type Ruleset struct {
 	Source string
 	Scope  string
+	// Format is the canonical-form major version this ruleset is written in. A file that
+	// declares none is 1, so the zero value reads correctly for every ruleset written before
+	// versioning existed -- unlike finding.Action, whose zero value had to mean "nobody
+	// judged", a missing format genuinely *is* version 1.
+	Format int
 	Rules  []Rule
 }
 
@@ -76,10 +94,66 @@ func (l Level) Valid() bool {
 	}
 }
 
+// readFormat takes the optional leading YAML block off md and returns the canonical-form
+// major version it declares, defaulting to 1 when there is none.
+//
+// A version newer than this parser understands is an error rather than a best effort. The
+// whole reason the block exists is that an unknown marker line is otherwise folded into a
+// rule's rationale, silently: refusing loudly is the behaviour being bought.
+//
+// Requires: nothing.
+// Ensures:  the returned format is in [1, FormatVersion]; body is md with any leading YAML
+//
+//	block removed; it is pure.
+func readFormat(md string) (format int, body string, err error) {
+	block, body := frontmatter.Split(md)
+	if strings.TrimSpace(block) == "" {
+		return 1, body, nil
+	}
+	var header struct {
+		Format int `yaml:"format"`
+	}
+	if uerr := yaml.Unmarshal([]byte(block), &header); uerr != nil {
+		return 0, "", fmt.Errorf("ruleset: unreadable format header: %w", uerr)
+	}
+	switch {
+	case header.Format == 0:
+		// A block that declares no format is v1 with metadata, not a malformed version.
+		return 1, body, nil
+	case header.Format < 1:
+		return 0, "", fmt.Errorf("ruleset: format %d is not a version", header.Format)
+	case header.Format > FormatVersion:
+		return 0, "", fmt.Errorf(
+			"ruleset: format %d is newer than this parser understands (%d)",
+			header.Format, FormatVersion)
+	}
+	return header.Format, body, nil
+}
+
+// renderFormat emits the version block, and only above version 1.
+//
+// Silence at 1 is what keeps this change inert: every ruleset written before versioning
+// existed renders byte-identically, so the canonical-form round-trip check canonizer is
+// adding does not report drift on files nobody touched.
+//
+// Written by hand rather than marshalled. The canonical form's promise is byte-stability,
+// and a marshaller's key order, quoting and line endings are its choice rather than ours.
+func renderFormat(format int) string {
+	if format <= 1 {
+		return ""
+	}
+	return fmt.Sprintf("---\nformat: %d\n---\n", format)
+}
+
 // Render emits rs in the canonical text form. It is deterministic: the same
 // Ruleset always renders byte-identically.
+//
+// A Format of 0 renders as version 1, so a Ruleset built in Go without setting it is a
+// valid v1 ruleset rather than a malformed one. Parse returns 1 for an undeclared file, so
+// the two agree on what a version-less ruleset is.
 func Render(rs Ruleset) string {
 	var b strings.Builder
+	b.WriteString(renderFormat(rs.Format))
 	fmt.Fprintf(&b, "Source: %s\n", rs.Source)
 	fmt.Fprintf(&b, "Scope:  %s\n", rs.Scope)
 	for i := range rs.Rules {
@@ -105,10 +179,16 @@ func Render(rs Ruleset) string {
 // Parse reads the canonical form Render emits. A malformed rule header or an
 // unknown severity/level is an error, not a silent skip.
 func Parse(md string) (Ruleset, error) {
+	format, body, err := readFormat(md)
+	if err != nil {
+		return Ruleset{}, err
+	}
+	md = body
 	var (
 		rs  Ruleset
 		cur *Rule
 	)
+	rs.Format = format
 	flush := func() {
 		if cur != nil {
 			rs.Rules = append(rs.Rules, *cur)

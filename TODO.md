@@ -632,6 +632,32 @@ met before the knowledge-base tool exists at all.
   approximate it: extracting a subject from prose by pattern would put an uncalibrated
   heuristic underneath a blocking gate, which is the exact shape rejected in the
   unified-thinking survey above.
+- [x] **The canonical form cannot gain an optional field safely.** DONE 2026-08-16 — the
+  version *reader* shipped, and **`FormatVersion` is 1**. Adding the ability to declare a
+  version changed no grammar, so no stored file changes and no marker was added. Framing this
+  as "add versioning" invites bumping to 2 in the same change; a version whose first act is
+  to break compatibility teaches every reader that the field is where breakage lives.
+  **Inert, proven on the real corpus rather than fixtures:** all **29** stored rulesets in the
+  family render byte-identically under v0.16.0 and under this change. `Render` emits the block
+  only above version 1, which is what keeps canonizer's forthcoming canonical-form `--check`
+  from reporting drift on files nobody touched — the new feature would otherwise manufacture
+  the failure the next feature exists to detect.
+  `Parse` resolves an undeclared file to 1, and `Render` treats 0 and 1 alike, so a `Ruleset`
+  built in Go without setting `Format` is a valid v1 ruleset rather than a malformed one.
+  Unlike `finding.Action`, the zero value here *is* a real answer: a file without a version is
+  version 1.
+  A future major is an error naming both versions, so an operator can tell "upgrade the tool"
+  from "fix the file". Four mutations caught behind a build gate, including one that accepted
+  a future major — a refusal nothing tests is decoration.
+  **Trade-off worth recording: `ruleset` was stdlib-only and is not any more.** Reading the
+  block uses `goccy/go-yaml`, already skillet's dependency via `skill` and `provenance`, so
+  consumers pick it up on their next bump (`go mod tidy` resolves it; canonizer verified).
+  A hand-rolled scan for one integer would have kept the package stdlib-pure, and was
+  rejected: it reimplements a YAML subset in a shared kernel, and a second reader for the same
+  block shape `skill` already parses is the drift this module exists to prevent.
+  **Deliberately not done: absorbing `Source:` and `Scope:` into the block.** That is a second
+  and larger migration, and doing it here would break the inert property above.
+  Original entry:
 - [ ] **The canonical form cannot gain an optional field safely — fix this before adding
   one.** Found while weighing the subject slot, and independent of whether that is ever
   built: **an unknown marker line is folded into `Rationale` rather than rejected.**
