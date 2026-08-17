@@ -717,6 +717,39 @@ met before the knowledge-base tool exists at all.
   ruleset but never the reasoning that produced them, and its findings already come back
   as `finding.Diagnostic`. The residue routes there; nothing new is needed in skillet for
   it.
+- [ ] **EVALUATED and NOT promoted 2026-08-17: OKF's trust fields (`generated`/`verified`).**
+  Three repos reference the Open Knowledge Format (`agent-blue/knowledge-catalog/okf/SPEC.md`,
+  v0.2, Apache-2.0) and I recommended promoting its trust vocabulary as the strongest
+  candidate in the family. **Checking the consumers says otherwise, and that recommendation
+  was wrong.** All three needs are conditional and none is present:
+  canonizer wants it *"if rulesets ever carry provenance metadata"*; exegesis records
+  *"Not scheduled: this waits on the knowledge-base decision"*; adh's is a follow-up inside an
+  already-closed item. Three repos wanting a thing *if something else happens* is one
+  prospective consumer counted three times, and this file already says one prospective
+  consumer is not evidence for a type.
+  **The cautionary precedent is in this module.** `skillet/provenance` is tested, complete,
+  and has **zero importers anywhere** — its own doc reads *"provisional… a speculative
+  extraction awaiting its first use. Delete it if it stays unused."* An OKF type promoted now
+  ships with the same comment.
+  **Trigger: the first repo that actually stores trust metadata** — a stored artifact, not a
+  decision to adopt OKF someday.
+  **The spec details worth not re-deriving**, read from the spec rather than from the three
+  TODO summaries:
+  - §5.2 — `generated: {by, at}` and `verified: [{by, at}]`, distinct *because who wrote a
+    concept need not be who confirmed it*. A bare mapping MUST read as a one-element list.
+    `verified` is independent of `generated.at`, so *changed without re-confirmation* and
+    *re-confirmed without regeneration* are separately representable — which is precisely the
+    distinction canonizer's `anchor-absent` split needs.
+  - §5.3 — trust tiers are a fold over an actor prefix: no `verified` ⇒ unverified;
+    non-`human:` only ⇒ machine-confirmed; any `human:<id>` ⇒ human-reviewed.
+  - §7 — actors are `<producer>/<version>`, `human:<id>`, `process:<id>`.
+  - §5.5 — `stale_after` is an absolute `YYYY-MM-DD`, deliberately not a TTL, so staleness is
+    a date comparison with no reference to read time. That reasoning is this family's house
+    standard, stated by someone else.
+  - §11 — consumers **MUST NOT** reject a concept for missing any optional family, so
+    adoption is incremental by specification.
+  When it does land it belongs **in the one consumer that needs it** until a second appears,
+  exactly as `quotecheck` stayed in exegesis.
 - [ ] **Adjudication is a distinct artifact from detection, and has no type yet.** When two
   rules conflict and a human picks one, the decision is knowledge present in neither source
   — so it can carry no `↦` anchor and **fails `verify.Provenance` by construction.** That
