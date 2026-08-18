@@ -717,6 +717,38 @@ met before the knowledge-base tool exists at all.
   ruleset but never the reasoning that produced them, and its findings already come back
   as `finding.Diagnostic`. The residue routes there; nothing new is needed in skillet for
   it.
+- [ ] **A coverage record beside findings: what the critic did NOT examine.** Two consumers,
+  **both with a present defect rather than a conditional want** — which is what separates this
+  from the OKF entry below.
+  canonizer: `critic_prompt.md` asks for `unsupported`/`vague`/`duplicate` findings, so an
+  empty category is indistinguishable from an uninspected one and `gate` ships on that
+  silence. adh: the same silence, and `evaluation` disposes of the arc on it. Same source for
+  both (`agent-blue/super-hermes` `skills/prism-scan/SKILL.md:57`), same mechanism — a
+  constraint footer, *"This analysis maximized X. It did not examine: …"*, with a persisted
+  report later runs read to steer away from exhausted angles.
+  **Both entries independently argue it does not compromise the cold split**, and that
+  argument is the reason it is admissible: a coverage record says *what was looked at*, never
+  *what was concluded* or how the artifact was produced. Feeding prior coverage to a fresh
+  critic biases it toward unexamined ground — the opposite of the contamination the cold split
+  prevents.
+  Shape, from canonizer's entry: an additive `examined` / `not_examined` block beside the
+  findings array, **advisory only — a critic that declares a gap must not thereby block, or it
+  will learn to declare none.** That constraint is the whole design and must survive
+  promotion. `finding.Result` is the natural home (19 references in canonizer alone), but the
+  field must not be reachable by `Severity`.
+- [ ] **Extract the checkable claims a document makes about its own repo.** Two consumers,
+  both present: exegesis (a skill body naming `make verify` or `bw sync` makes a claim nothing
+  checks; `lint` covers links and `skillsaw` dim 6 covers reachability, so **commands are the
+  uncovered half**) and adh (`doctor` checks harness integrity and `context verify` checks
+  drift; neither checks that an instruction's commands resolve). Same source for both —
+  `agent-blue/agentic-harness-bootstrap` Principle 1, whose `verify-harness.sh.tmpl` parses
+  the module table out of `ARCHITECTURE.md` and checks each path exists.
+  **Split the promotion at the environment boundary**, which is the design decision: finding
+  command-shaped claims in a body is a pure text function and belongs here; *resolving* one to
+  an executable is environment-dependent in a way link resolution is not, and belongs in the
+  consumer. Evidence out, policy to the caller — the same boundary `skilllens` draws.
+  exegesis's caution carries up: because resolution is environmental, this is a **warning**
+  tier and probably opt-in, never a hard gate.
 - [ ] **EVALUATED and NOT promoted 2026-08-17: OKF's trust fields (`generated`/`verified`).**
   Three repos reference the Open Knowledge Format (`agent-blue/knowledge-catalog/okf/SPEC.md`,
   v0.2, Apache-2.0) and I recommended promoting its trust vocabulary as the strongest
