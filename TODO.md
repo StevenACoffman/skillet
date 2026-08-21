@@ -557,6 +557,32 @@ already owns.
   than `stats`. Only the calibration math (and a few isolated algorithms, noted in the
   consumer TODOs) are worth lifting.
 
+## quotecheck Promoted (2026-08-20)
+
+- [x] **`quotecheck` promoted from `exegesis/internal/quotecheck` on its second
+      consumer.** gnosis is the second, and its most important one — the fabrication guard
+      over every ingested source. Lives at `skillet/quotecheck`.
+      **Only the comparison moved.** `Segment` (RIA segment labels) and the
+      `redlines.Quotes` extraction stayed in exegesis, and the promoted package takes
+      `[]string` quotations rather than a body. Where a quotation *begins* is the one thing
+      the shared package must not know: exegesis says blockquote-inside-R, gnosis reads
+      `gnosis_evidence` frontmatter, and a kernel carrying either convention is a general
+      mechanism the other consumer has to route around.
+      **The third outcome is the substantive addition.** `Status` is
+      `Unchecked`/`Found`/`Missing` with **Unchecked as the zero value**, following
+      `finding.Action`'s absent classification and `timeseries.Verdict.Compared`. Two states
+      conflated three: "searched and not found" is the guard firing, "no sources supplied"
+      and "every passage below `MinPassageWords`" are not, and the last was worse than
+      mislabelled — a quotation too short to split produced **zero findings**, so it vanished
+      and a caller counting findings saw a clean pass over something nobody checked.
+      Watch for: `Finding` now has two fields that can disagree. `Status` is authoritative and
+      `FoundIn` is descriptive; a `Finding{FoundIn: "x"}` with no Status is an inconsistent
+      value, and it caught exegesis's own test fixture on adoption.
+      **Not yet released.** exegesis is on a `replace` directive until this is tagged, and
+      gnosis cannot depend on it before then.
+
+______________________________________________________________________
+
 ## Contradiction Detection — Knowledge-Base Ingestion (Agent-Red Survey, 2026-08-15)
 
 Source: a survey of `~/Documents/agent-red` (26 agent-tooling projects) against the
@@ -566,6 +592,15 @@ matters here holds across all 26: **every one of them detects similarity; none a
 conflict.** llmwiki surfaces contradictions, mnemon deduplicates, coherence finds broken
 support links — nothing decides which of two conflicting claims is authoritative, or
 records why.
+
+**Update 2026-08-20, from the gnosis side.** `ruleset/conflict` shipped and is right for
+rulesets, and it is **not** reusable for a knowledge corpus. It reads `Statement`,
+`Severity`, `Level`, and `Section` off a `ruleset.Rule`; a gnosis claim has none of those,
+and its decidable predicates are numeric, threshold, and enumeration comparisons over a
+subject key. The two share a *shape* — pure, deterministic, findings not scores,
+fold-normalised equality — and nothing else. Generalising `Find` across both would put
+`if isRule … else if isClaim` inside a general mechanism. So gnosis writes its own, and this
+reopens only if a third consumer wants the same comparison.
 
 The family already owns both halves that bracket the gap. `ruleset` carries the typed
 normative form (§, MUST/SHOULD/CONSIDER, CODE/ARCH/METHOD, `SourceAnchor`); `finding`
@@ -838,8 +873,69 @@ met before the knowledge-base tool exists at all.
   `MinPassageWords`, which is why it survives contact with a real corpus. The
   knowledge-base ingestion tool is `quotecheck`'s 2nd consumer; that is what earns the
   promotion, not the survey.
+  - [ ] **The 2nd consumer needs a third outcome: not-applicable.** `gnosis`
+    (`~/Documents/git/gnosis/SPEC.md` §4.3) admits sources it cannot archive — a PDF, an
+    image, anything binary — as `referenced`: hash and URI recorded, no local text kept,
+    deliberately no PDF extractor. For those, **there is nothing to compare a quote
+    against**, and that is neither a pass nor a failure. Today `Passages`/`Segment` answer
+    "which quotations are absent from the source"; a caller with no source text can only
+    fake an empty haystack, which reports every quote as fabricated — the worst possible
+    default, since it would either block admissible claims or teach a caller to skip the
+    guard.
+    Shape: keep the pure core exactly as it is and let the *result* carry the distinction —
+    a checked/unchecked flag beside the absent list, so "no source text was available" is a
+    stated fact rather than an inferred zero. This is the same discipline as
+    `timeseries.Verdict.Compared` and `stats`' empty-input handling: absence of a comparison
+    is a distinct state, never a passing one. exegesis has no `referenced` sources today, so
+    this is a gnosis-driven addition to a shared package — recorded here so the signature
+    change has a reason attached when exegesis sees it.
 - Note for whoever picks this up: pair comparison is O(n²) and that is fine. The corpus is
   233 skills; a ruleset is tens of rules. Do not build a candidate index until a
   measurement says the quadratic hurts — `skillex` (`agent-red/skillex`) is the reference
   design if one is ever needed, but an index bought on speculation is a second source of
   truth about which pairs exist.
+
+## Agent-Fuschia Survey (2026-08-18)
+
+Source: a survey of `~/Documents/agent-fuschia` (26 repositories), driven by the gnosis
+work. Three items, each checked against the code here as well as there.
+
+- [ ] **`finding.Category` is an untyped string while `Severity` and `Action` are typed.**
+  `finding.go:46` is `Category string \`json:"category,omitempty"\``, so nothing prevents
+  two tools — or two checks in one tool — from spelling the same failure differently, and
+  `Sort` orders on a free-form field. `agent-fuschia/vac-protocol` §4 takes the other road:
+  a **closed vocabulary of nineteen named reasons** (`missing-artifact`, `sha256-mismatch`,
+  `unlisted-file`, `summary-mismatch`, `summary-outruns-checks`, `stamp-mismatch`,
+  `issuer-commit-mismatch`, `unsafe-archive`, …), "one named reason per failure", with the
+  vocabulary written into the spec so a consumer can exhaustively handle it.
+  **The tension is real and this entry does not resolve it:** a closed enum here would be a
+  kernel type that every consumer's private categories must fit, and exegesis, skillsaw,
+  adh, and canonizer have genuinely different failure taxonomies — which is presumably why
+  it was left open. The tractable middle is a *registration* seam rather than an enum: each
+  consumer declares its category set once, `finding` offers a validator, and an unregistered
+  category is a programming error rather than a silent typo. Do not build until a second
+  consumer has actually mis-spelled one; recorded so the option is visible when it happens.
+- [ ] **A set hash beside `identity.Hash`.** `identity.Hash` fingerprints one artifact;
+  nothing fingerprints *a collection*. `agent-fuschia/gradecore`'s `suite_hash`
+  (`gradecore/freeze.py:20`) is `sha256[:12]` over `"|".join(identities)`, and it exists to
+  make "these two implementations agree" a checkable claim rather than an asserted one —
+  which is this package's entire reason for existing, applied one level up. Its docstring
+  also names the weakness in the scheme it is compatible with: an `id:prompt` fingerprint
+  "misses an edited answer-key", so the grader id and expected value must be folded into
+  each identity string. Prospective consumers: `manifest` (does this tree hash to what the
+  last verify saw), skillsaw (has the rubric changed), gnosis (has the corpus). Hold for the
+  2nd — `manifest.Diff` already answers the tree question a different way, and two answers
+  to one question is the defect this repo exists to prevent.
+- Note, not a work item: `gradecore`'s README **corrects itself in public** — *"'Shared by'
+  was the older wording here and it was false in code"* — and replaces the claim with the
+  checkable one (same `suite_hash`, all 35 graders lift through `bool_grader`, 0 of 175
+  verdicts differing). That is the standard for how this family should word any "these two
+  tools cannot drift" claim, several of which appear in this file.
+- Deliberately NOT adopted: `agent-fuschia/claim-segmenter-kit`'s deterministic sentence
+  segmentation, despite being an excellent fit for the kernel's theme. It is Swift, so
+  nothing is importable, and it currently has exactly one prospective consumer (gnosis).
+  If canonizer needs the same segmentation for rule bodies — plausible, since a `§` rule
+  statement can carry two assertions exactly as a wiki sentence can — that is the 2nd
+  consumer and it moves here. Recorded in gnosis's TODO with the algorithm's guarantee
+  ("every emitted claim stands on its own, or the cut is not made") so the design is not
+  re-derived.
