@@ -2,10 +2,32 @@
 
 **A Go toolkit for turning prose expertise into verifiable, runtime-neutral Agent Skills.**
 
-`skillet` is the shared kernel behind a family of skill tools (exegesis, skillsaw,
-canonizer, modelith). When two of them parse the same `SKILL.md` or hash the same
-artifact, they must reach byte-identical answers. skillet provides that logic once, so the
-tools never drift apart.
+`skillet` is the shared kernel behind a family of tools. When two of them parse the same
+`SKILL.md`, hash the same artifact, or fold the same quotation, they must reach
+byte-identical answers. skillet provides that logic once, so the tools never drift apart.
+
+## Who Uses It
+
+Nothing lands here on speculation. A package moves into skillet **on its second consumer**,
+because one consumer is not evidence that a thing is shared — it is evidence that one tool
+needed it. Until then it stays where it was written.
+
+| Tool                                                                           | Does                                                                                 | Uses from skillet                                                                                                                                                                                |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [`exegesis`](https://github.com/StevenACoffman/exegesis)                       | Distills a book into a tree of Agent Skills and gates their structure                | `skill` `markdown` `speclint` `redlines` `neutrality` `skilllens` `quotecheck` `textnorm` `naming` `manifest` `finding` `identity` `frontmatter` `atomicfile` `testprompts` `ruleset/synthesize` |
+| [`skillsaw`](https://github.com/StevenACoffman/skillsaw)                       | Scores, diagnoses, and validates skills against a 9-dimension rubric                 | `skill` `markdown` `speclint` `redlines` `neutrality` `skilllens` `judge` `ratchet` `calibration` `auditlog` `manifest` `finding` `identity` `testprompts`                                       |
+| [`canonizer`](https://github.com/StevenACoffman/canonizer)                     | Turns source documents into coding rulesets and grades them independently            | `ruleset` `ruleset/conflict` `ruleset/distill` `ruleset/synthesize` `judge` `proof` `markdown` `skilllens` `calibration` `finding` `textnorm`                                                    |
+| [`agentic-dev-harness`](https://github.com/StevenACoffman/agentic-dev-harness) | Five-stage harness for an agent to plan, build, review, and validate its own changes | `proof` `ratchet` `calibration` `stats` `skilllens` `markdown` `identity` `frontmatter` `atomicfile` `errs`                                                                                      |
+| [`gnosis`](https://github.com/StevenACoffman/gnosis)                           | Accretes outside knowledge into a git-backed corpus, gating every claim on evidence  | `finding` `markdown` `frontmatter` `textnorm` `identity` `errs`                                                                                                                                  |
+
+[`steve-skill-market`](https://github.com/StevenACoffman/steve-skill-market) sits one layer
+up: it is the Agent Skills catalogue, and several of its skills drive these CLIs rather than
+reimplementing them — `skillsaw-skill` runs the rubric through `skillsaw`, `book2skill`
+runs the distillation through `exegesis`, and `merge-skills` and `webapp-review` reach for
+`canonizer`. The division is deliberate and is the reason skillet exists: **everything
+measurable is a CLI, and the agent is reserved for the judgments a deterministic check
+cannot make.** A skill that reimplemented the scoring would drift from the tool that gates
+on it.
 
 ## Why Use It
 
@@ -73,16 +95,18 @@ Each package does one job and depends on little. Take only what you need.
 
 ### Skills and Markdown
 
-| Package       | Purpose                                                                                                                                                                                         |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `skill`       | Load and parse Agent Skills (`SKILL.md`): frontmatter plus Markdown body.                                                                                                                       |
-| `markdown`    | Structured view of a skill body via goldmark (headings, fences, lists, tables).                                                                                                                 |
-| `speclint`    | Validate `SKILL.md` frontmatter against the agentskills.io spec (description cap, allowed keys). The single source of truth for the spec's drift-prone data.                                    |
-| `neutrality`  | Red-light scan that flags runtime-binding wording, so a skill installs in any runtime.                                                                                                          |
-| `frontmatter` | Split a leading `---` YAML block from the Markdown body. Normalizes CRLF, so a caller that forgets to cannot get an empty header instead of an error.                                           |
-| `redlines`    | book2skill's mechanical Quality Red Lines: the six RIA-TV++ segments, the per-quotation word ceiling, and a description that states its trigger.                                                |
-| `skilllens`   | The three SkillLens quality detectors — failure mechanisms, softening phrases, blacklist sections — returning located evidence rather than diagnostics, so each consumer sets its own severity. |
-| `timeseries`  | Detect a regression against a rolling baseline rather than a fixed threshold.                                                                                                                   |
+| Package       | Purpose                                                                                                                                                                                                                       |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `skill`       | Load and parse Agent Skills (`SKILL.md`): frontmatter plus Markdown body.                                                                                                                                                     |
+| `markdown`    | Structured view of a skill body via goldmark (headings, fences, lists, tables).                                                                                                                                               |
+| `speclint`    | Validate `SKILL.md` frontmatter against the agentskills.io spec (description cap, allowed keys). The single source of truth for the spec's drift-prone data.                                                                  |
+| `neutrality`  | Red-light scan that flags runtime-binding wording, so a skill installs in any runtime.                                                                                                                                        |
+| `frontmatter` | Split a leading `---` YAML block from the Markdown body. Normalizes CRLF, so a caller that forgets to cannot get an empty header instead of an error.                                                                         |
+| `redlines`    | book2skill's mechanical Quality Red Lines: the six RIA-TV++ segments, the per-quotation word ceiling, and a description that states its trigger.                                                                              |
+| `skilllens`   | The three SkillLens quality detectors — failure mechanisms, softening phrases, blacklist sections — returning located evidence rather than diagnostics, so each consumer sets its own severity.                               |
+| `timeseries`  | Detect a regression against a rolling baseline rather than a fixed threshold.                                                                                                                                                 |
+| `textnorm`    | Fold the differences between two copies of the same words that nobody means as differences: whitespace runs and typographic characters. The single normalizer, so no two guards disagree about what counts as the same words. |
+| `quotecheck`  | The fabrication guard: given quotations and the texts they claim to come from, report which cannot be found. Three outcomes — found, missing, and **unchecked**, because "nobody looked" is not the claim "this is fine".     |
 
 ### Rulesets and the Distillation Pipeline
 
@@ -91,6 +115,7 @@ Each package does one job and depends on little. Take only what you need.
 | `ruleset`            | Typed model of a distilled ruleset. Each `Rule` carries a severity, level, rationale, ✗/✓ example pair, and source anchor. `Render` and `Parse` round-trip. |
 | `ruleset/distill`    | Fill a per-source distillation prompt for each source document.                                                                                             |
 | `ruleset/synthesize` | Assemble distilled rulesets into one synthesis prompt.                                                                                                      |
+| `ruleset/conflict`   | Find decidable inconsistencies between rules — severity and level divergence, section collisions. Exact predicates only; no threshold, no similarity score. |
 | `naming`             | Derive filenames and human titles for the distillation pipeline.                                                                                            |
 | `testprompts`        | Conservatively derive judge checks from expected-output prose.                                                                                              |
 
