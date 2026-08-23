@@ -1675,7 +1675,52 @@ code applies to shared backlogs — one home, and a pointer from everywhere else
   and must not acquire. gnosis reached the same conclusion from the other side when it
   declined to import this package for claim predicates: what the two share is a shape,
   and a shape is followed rather than imported.
-- [ ] **A shipped skill and a repo-governing skill are graded against one rubric, and
+- [ ] **A skill is graded against contracts it never claimed, and the entry below names the
+  wrong axis for it.** REVISED 2026-08-23 after measuring; the original framing follows.
+  **There are two orthogonal axes, not one binary, and the one this entry proposed is the
+  smaller half.** Measured with `lint --check redlines` over the corpus:
+
+  | skill                                      | audience       | lineage      | redline errors |
+  | ------------------------------------------ | -------------- | ------------ | -------------- |
+  | `gh-cli`, `vale`, `unconventional-commits` | shipped        | hand-written | **7 each**     |
+  | `book2skill`                               | repo-governing | hand-written | 3              |
+  | `go-beyond-packages-as-layers`             | shipped        | book-derived | **0**          |
+
+  The axis firing in `redlines` is **lineage** — book-derived versus hand-written — not
+  audience. A shipped hand-written skill collects seven errors for a format it never claimed,
+  so a `Kind` carrying only shipped/repo-governing would fix a minority of the misjudgment.
+  Both axes are real and independent; `speclint`'s published-artefact contract keys on
+  audience, `redlines`' RIA-TV++ contract keys on lineage.
+  **Two single-valued closed fields, not a set.** A `Kinds []Kind` makes
+  `{shipped, repo-governing}` representable, and a contradiction the type accepts is one
+  validation has to catch forever — model the constraint in the type instead. A set also
+  invites the bag: once membership is a list, every later convention gets appended rather
+  than reasoned about. If only one ships first it should be **lineage**, where the
+  seven-error case lives.
+  **Closed and typed, and this deliberately inverts the `finding.Category` decision.**
+  Category stays an untyped string because its drift is cosmetic — `softening` versus
+  `skilllens-softening` named one finding twice and nothing branched on it, so canonizer's
+  output did not move when it adopted the constant. A kind's drift is **behavioural**: a tool
+  writing `repo-local` where another expects `repo-governing` falls back to a default and a
+  *different set of checks runs*. Same rule as Category, applied with more force — where the
+  kernel owns the rules a value selects, the kernel owns the value's vocabulary.
+  **No aliases.** An unknown kind is a typo or a newer vocabulary, and both want the same
+  handling: strictest interpretation, and report it. Silence is what makes a typo dangerous —
+  `repo-govening` must not quietly buy lenient treatment. An alias table also manufactures
+  synonyms, which the Category entry names as the failure that actually occurred, and it
+  never shrinks. Vocabulary evolution belongs to a format version, which `ruleset` now has.
+  **Still not built, and the trigger is unchanged: a second checker that would branch on the
+  field.** `Check.Applies`, cited below as the precedent, **does not exist in this module** —
+  grep returns nothing — so building to it would be building to a shape that was never built.
+  And nobody has written which rules each kind keeps: `speclint`'s description cap plausibly
+  survives for a repo-governing skill, its trigger-condition rule plausibly does not, and
+  until that list exists the field is a kind nobody branches on.
+  `provenance` is the completed cautionary case rather than a live one — carried tested with
+  zero importers until v0.20.0 deleted it.
+  **exegesis is where this fires**, and its `--check redlines` mixed-tree entry is still open
+  with a recorded argument against a derived gate. One question, two repositories.
+  Original entry, whose framing the measurement above corrects:
+  **A shipped skill and a repo-governing skill are graded against one rubric, and
   should not be.** `gentle-ai` keeps `internal/assets/skills/` — embedded, ships to
   users — apart from `skills/`, which is repo-local and governs work on the tool
   itself. The distinction is real and this family does not draw it: `speclint`'s rules
