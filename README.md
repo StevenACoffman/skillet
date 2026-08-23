@@ -15,7 +15,7 @@ needed it. Until then it stays where it was written.
 | Tool                                                                           | Does                                                                                 | Uses from skillet                                                                                                                                                                                |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [`exegesis`](https://github.com/StevenACoffman/exegesis)                       | Distills a book into a tree of Agent Skills and gates their structure                | `skill` `markdown` `speclint` `redlines` `neutrality` `skilllens` `quotecheck` `textnorm` `naming` `manifest` `finding` `identity` `frontmatter` `atomicfile` `testprompts` `ruleset/synthesize` |
-| [`skillsaw`](https://github.com/StevenACoffman/skillsaw)                       | Scores, diagnoses, and validates skills against a 9-dimension rubric                 | `skill` `markdown` `speclint` `redlines` `neutrality` `skilllens` `judge` `ratchet` `calibration` `auditlog` `manifest` `finding` `identity` `testprompts`                                       |
+| [`skillsaw`](https://github.com/StevenACoffman/skillsaw)                       | Scores, diagnoses, and validates skills against a 9-dimension rubric                 | `skill` `markdown` `speclint` `redlines` `neutrality` `skilllens` `judge` `ratchet` `calibration` `manifest` `finding` `identity` `testprompts`                                                  |
 | [`canonizer`](https://github.com/StevenACoffman/canonizer)                     | Turns source documents into coding rulesets and grades them independently            | `ruleset` `ruleset/conflict` `ruleset/distill` `ruleset/synthesize` `judge` `proof` `markdown` `skilllens` `calibration` `finding` `textnorm`                                                    |
 | [`agentic-dev-harness`](https://github.com/StevenACoffman/agentic-dev-harness) | Five-stage harness for an agent to plan, build, review, and validate its own changes | `proof` `ratchet` `calibration` `stats` `skilllens` `markdown` `identity` `frontmatter` `atomicfile` `errs`                                                                                      |
 | [`gnosis`](https://github.com/StevenACoffman/gnosis)                           | Accretes outside knowledge into a git-backed corpus, gating every claim on evidence  | `finding` `markdown` `frontmatter` `textnorm` `identity` `errs`                                                                                                                                  |
@@ -121,14 +121,13 @@ Each package does one job and depends on little. Take only what you need.
 
 ### Verification and Scoring
 
-| Package      | Purpose                                                                                         |
-| ------------ | ----------------------------------------------------------------------------------------------- |
-| `finding`    | The one shared diagnostic type (severity, category, path, message) every linter and gate emits. |
-| `judge`      | Deterministic rule-judge: hard = all checks pass, soft = fraction passed.                       |
-| `manifest`   | Build the machine-readable record of a verified skill tree.                                     |
-| `proof`      | No-proof-no-close gate: every declared artifact must exist and match its digest.                |
-| `identity`   | Content-identity hashing shared across tools, so an artifact has one identity everywhere.       |
-| `provenance` | Read and write the header that marks a file as a vendored copy of an upstream artifact.         |
+| Package    | Purpose                                                                                         |
+| ---------- | ----------------------------------------------------------------------------------------------- |
+| `finding`  | The one shared diagnostic type (severity, category, path, message) every linter and gate emits. |
+| `judge`    | Deterministic rule-judge: hard = all checks pass, soft = fraction passed.                       |
+| `manifest` | Build the machine-readable record of a verified skill tree.                                     |
+| `proof`    | No-proof-no-close gate: every declared artifact must exist and match its digest.                |
+| `identity` | Content-identity hashing shared across tools, so an artifact has one identity everywhere.       |
 
 ### Optimization and Statistics
 
@@ -137,7 +136,6 @@ Each package does one job and depends on little. Take only what you need.
 | `stats`       | Small deterministic statistics (Wilson score intervals and friends).                                                  |
 | `calibration` | Measure how well stated confidences match observed outcomes (ECE, MCE, Brier). The reliability complement to `stats`. |
 | `ratchet`     | Keep/revert gate and activation confusion matrix for optimization loops.                                              |
-| `auditlog`    | Read and write the optimization log (`results.tsv`).                                                                  |
 
 ### Foundations
 

@@ -36,6 +36,48 @@ const (
 	KindSection Kind = "section" // a heading whose title matches
 )
 
+// The finding.Diagnostic categories for this package's three detectors.
+//
+// They live here because the detector lives here: two consumers reading one detector and
+// naming its output differently is drift, and it had already happened -- exegesis emitted
+// "skilllens-softening" and canonizer "softening" for the same SofteningPhrases call.
+// The rule this generalizes: where the kernel owns the detector, the kernel owns the name.
+//
+// Unprefixed on purpose. Across the family's thirty category values there is not one
+// same-word-different-meaning collision, and the only observed defect is the opposite --
+// one concept spelled two ways. A package prefix defends against the hazard that has never
+// occurred and manufactures the one that has, since a second mechanism detecting the same
+// class would have to spell it differently. It would also put provenance in a field that
+// classifies, which is the collapse Severity and Action are kept apart to avoid.
+//
+// Each names the defect rather than the dimension, and the no-X form follows canonizer's
+// existing convention -- no-anchor for never declared, anchor-absent for declared and not
+// found. Two of the three detectors fire on absence, so naming them for the dimension read
+// as the opposite of what they mean: a "failure" category that means no failure handling
+// was written.
+//
+// What a shared name does NOT make shared, because the two are easy to conflate and the
+// package's whole charter is the difference: a category names the finding class, never the
+// threshold that decides whether to report one. Consumers of one detector legitimately
+// disagree about when its evidence is a defect, and today they do -- exegesis reports
+// softening at len >= 3, canonizer at len > 0, from the same SofteningPhrases call.
+// FailureMechanisms feeds a bare presence test in exegesis, a kind-filtered count in
+// skillsaw gated on Doc.HasCodeBlock, and a 0..1 factor in adh. All four are correct for
+// what they grade. Sharing the name is what stops them describing one finding two ways;
+// it is not an invitation to reconcile the policies, and a change that made them agree
+// would be undoing the deliberate split stated above -- evidence out, policy to the caller.
+const (
+	// CategoryNoFailureMode is reported when FailureMechanisms finds nothing: the skill
+	// says nothing about what to do when the thing it describes goes wrong.
+	CategoryNoFailureMode = "no-failure-mode"
+	// CategorySoftening is reported when SofteningPhrases finds hedges. It is the one
+	// detector of the three that fires on presence.
+	CategorySoftening = "softening"
+	// CategoryNoBoundary is reported when BlacklistSections finds nothing: the skill
+	// draws no boundary around what not to do.
+	CategoryNoBoundary = "no-boundary"
+)
+
 // failureCN and failureEN detect inline "if X fails / when Y errors" branches.
 //
 // Both languages are carried deliberately: the vocabulary began in a Chinese-language
@@ -59,6 +101,27 @@ type Kind string
 type Span struct {
 	Kind Kind
 	// Text is the matched fragment for a prose span, or the heading title for a section.
+	//
+	// Do not display it raw when it came from a regex detector. FailureMechanisms matches
+	// against Doc.Prose, where code blocks and spans are blanked to spaces, so a branch
+	// written "If `go test ./...` fails" arrives here as "If" + thirteen spaces + "fail".
+	// The window is also an arbitrary cut -- the pattern allows 40 characters between the
+	// conditional and the failure word, so matches routinely end mid-word ("the right
+	// fail" from "failures"). Both make it good for counting and debugging, and poor for
+	// showing a reader.
+	//
+	// SofteningPhrases and the section detectors are unaffected: the first reports the
+	// vocabulary term it searched for, the second the heading title, and neither is ever
+	// blank. Today no consumer in the family reads this field except canonizer, which
+	// reads a SofteningPhrases term -- so the hazard is real and currently unmet.
+	//
+	// If a consumer ever needs displayable evidence the answer is byte offsets on this
+	// struct, not a copy of the source carried beside the match: Doc holds no body, so
+	// carrying the substring would mean the kernel storing a second copy of every source
+	// or taking one as a parameter, and offsets let the caller widen the window to
+	// something readable, which a fixed match cannot. Prose is byte-offset-identical to
+	// the source, so an offset here indexes the caller's own body -- see
+	// markdown.TestProsePreservesOffsets, which pins the property this would depend on.
 	Text string
 	// Units is the section's count of concrete content (list items, table rows,
 	// substantial paragraphs); zero for a prose span.

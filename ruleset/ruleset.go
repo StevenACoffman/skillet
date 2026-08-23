@@ -198,10 +198,7 @@ func Parse(md string) (Ruleset, error) {
 	for _, line := range strings.Split(md, "\n") {
 		trimmed := strings.TrimSpace(line)
 		switch {
-		case strings.HasPrefix(line, "Source:"):
-			rs.Source = strings.TrimSpace(strings.TrimPrefix(line, "Source:"))
-		case strings.HasPrefix(line, "Scope:"):
-			rs.Scope = strings.TrimSpace(strings.TrimPrefix(line, "Scope:"))
+		case applyMeta(&rs, line):
 		case strings.HasPrefix(line, "§"):
 			flush()
 			r, err := parseHeader(line)
@@ -210,11 +207,30 @@ func Parse(md string) (Ruleset, error) {
 			}
 			cur = &r
 		case cur != nil && trimmed != "":
-			applyBody(cur, trimmed)
+			if err := applyBody(cur, trimmed); err != nil {
+				return Ruleset{}, err
+			}
 		}
 	}
 	flush()
 	return rs, nil
+}
+
+// applyMeta consumes a ruleset-level metadata line, reporting whether it did.
+//
+// It returns a bool rather than setting a field and falling through, so Parse's
+// switch has one arm for "this line is metadata" instead of one per key — which is
+// what keeps adding a key from making the dispatch harder to read.
+func applyMeta(rs *Ruleset, line string) bool {
+	switch {
+	case strings.HasPrefix(line, "Source:"):
+		rs.Source = strings.TrimSpace(strings.TrimPrefix(line, "Source:"))
+	case strings.HasPrefix(line, "Scope:"):
+		rs.Scope = strings.TrimSpace(strings.TrimPrefix(line, "Scope:"))
+	default:
+		return false
+	}
+	return true
 }
 
 func parseHeader(line string) (Rule, error) {
@@ -230,19 +246,4 @@ func parseHeader(line string) (Rule, error) {
 		return Rule{}, fmt.Errorf("ruleset: unknown level %q in %q", lvl, line)
 	}
 	return Rule{Section: m[1], Severity: sev, Level: lvl, Statement: strings.TrimSpace(m[4])}, nil
-}
-
-func applyBody(r *Rule, trimmed string) {
-	switch {
-	case strings.HasPrefix(trimmed, "✗"):
-		r.Bad = strings.TrimSpace(strings.TrimPrefix(trimmed, "✗"))
-	case strings.HasPrefix(trimmed, "✓"):
-		r.Good = strings.TrimSpace(strings.TrimPrefix(trimmed, "✓"))
-	case strings.HasPrefix(trimmed, "↦"):
-		r.SourceAnchor = strings.TrimSpace(strings.TrimPrefix(trimmed, "↦"))
-	case r.Rationale == "":
-		r.Rationale = trimmed
-	default:
-		r.Rationale += " " + trimmed
-	}
 }

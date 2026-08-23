@@ -12,7 +12,9 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	extast "github.com/yuin/goldmark/extension/ast"
+	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 )
 
 // Section is a Markdown heading and a count of its concrete body content
@@ -26,27 +28,110 @@ type Section struct {
 
 // Doc is the parsed view of a SKILL.md body.
 type Doc struct {
-	Sections       []Section
-	Prose          string   // body text with code blocks and code spans blanked
-	Links          []string // link destinations and code-span contents (ref candidates)
+	Sections []Section
+	Prose    string   // body text with code blocks and code spans blanked
+	Links    []string // link destinations and code-span contents (ref candidates)
+
+	// CodeSpans is the contents of every inline code span, in document order.
+	//
+	// Links already carries these, mixed with link destinations, because a consumer
+	// resolving references wants both. A consumer asking a different question — which
+	// of these is a command this document claims its repository supports — cannot use
+	// that slice without treating destinations as candidates. Separate rather than
+	// splitting Links, which four consumers read.
+	CodeSpans      []string
 	HasOrderedList bool
-	HasCodeBlock   bool // a fenced or indented code block, never an inline code span
+	// HasCodeBlock reports a fenced or indented code block, never an inline code span.
+	//
+	// It is a derived fact, and consumers use it to decide whether a check applies at
+	// all -- skillsaw's dim 3 and adh's failure-handling factor both ask it before
+	// deducting. An obligation comes with that use, and it is not enforceable here:
+	// a consumer that suppresses anything on this predicate must say so and say why.
+	// A check that silently declines is indistinguishable from one that found nothing.
+	// What gets suppressed is the consumer's choice -- a deduction, a whole check, or
+	// nothing at all; the reason is not.
+	HasCodeBlock bool
 }
 
 // Parse parses a Markdown body. It is pure: same input, same Doc. GFM is enabled
 // so tables are recognized.
+//
+// It parses twice, over the same bytes, and the second parse exists for one reason:
+// **a fenced code block written inside an HTML block is not a code block.** A
+// `<Good>` tag with no blank line after it opens a CommonMark type-7 HTML block that
+// runs to the next blank line, swallowing any fence inside it — so `prose` never sees
+// a FencedCodeBlock to blank, and the example's own code reaches Prose as though the
+// skill had instructed it. `<Good>`/`<Bad>` wrappers around examples are a documented
+// convention, so this is the common case rather than a corner.
+//
+// The second parse removes the HTML block parser, which turns those fences back into
+// fences. It is used for Prose and HasCodeBlock — the two answers about *what code
+// this document contains* — and deliberately not for Sections, Links, or
+// HasOrderedList, whose answers are about document structure, where an HTML block
+// genuinely is one block.
+//
+// Blanking the whole HTML block was the obvious one-line alternative and is wrong:
+// `<Good>Always validate input.</Good>` is a real instruction that reaches Prose
+// correctly today, and blanking the block would destroy it. Scanning the block's raw
+// lines for fence delimiters was the other, and it is a second fence implementation
+// in the package whose first sentence says it does not have one.
 func Parse(body string) *Doc {
 	src := []byte(body)
-	md := goldmark.New(goldmark.WithExtensions(extension.GFM))
-	root := md.Parser().Parse(text.NewReader(src))
+	root := goldmark.New(goldmark.WithExtensions(extension.GFM)).
+		Parser().Parse(text.NewReader(src))
+	code := codeParser().Parser().Parse(text.NewReader(src))
 	blocks := children(root)
 	return &Doc{
 		Sections:       sections(blocks, src),
-		Prose:          prose(root, src),
+		Prose:          prose(code, src),
 		Links:          links(root, src),
+		CodeSpans:      codeSpans(root, src),
 		HasOrderedList: hasOrderedList(root),
-		HasCodeBlock:   hasCodeBlock(root),
+		HasCodeBlock:   hasCodeBlock(code),
 	}
+}
+
+// codeParser is goldmark with the HTML block parser removed, so a fence inside an
+// HTML block parses as a fence.
+//
+// Requires: nothing.
+// Ensures: a parser producing the same offsets as the default one over the same
+// source — it removes a block parser and adds none, so every segment still indexes
+// the original bytes. Prose depends on that and TestProsePreservesOffsets pins it.
+//
+// The parser is **constructed** rather than configured, which is not a style choice:
+// `parser.WithBlockParsers` passed to `goldmark.New` *appends* to the defaults, so
+// there is no option that removes one. Replacing the parser means restating the
+// inline parsers and paragraph transformers, which is why they appear here unchanged.
+//
+// The HTML block parser is found by pointer identity, because
+// `parser.NewHTMLBlockParser` returns a package-level singleton. The reader's first
+// guess is a type switch, and that is why this comment exists: the concrete type is
+// unexported, so a type switch would have to match on a name string and would
+// silently match nothing the day goldmark renames it.
+//
+// Pointer identity can fail the same way — if a future goldmark stops returning a
+// singleton, nothing here removes anything and Prose quietly regresses. The guard is
+// TestFenceInsideHTMLBlockIsBlanked, which asserts the *behaviour* rather than the
+// mechanism: it fails whether the filter missed, the parser changed, or the fix was
+// removed. A length assertion would only catch the first.
+func codeParser() goldmark.Markdown {
+	htmlBlocks := parser.NewHTMLBlockParser()
+	defaults := parser.DefaultBlockParsers()
+	kept := make([]util.PrioritizedValue, 0, len(defaults))
+	for _, p := range defaults {
+		if p.Value != htmlBlocks {
+			kept = append(kept, p)
+		}
+	}
+	return goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithParser(parser.NewParser(
+			parser.WithBlockParsers(kept...),
+			parser.WithInlineParsers(parser.DefaultInlineParsers()...),
+			parser.WithParagraphTransformers(parser.DefaultParagraphTransformers()...),
+		)),
+	)
 }
 
 func children(root ast.Node) []ast.Node {
@@ -159,6 +244,19 @@ func links(root ast.Node, src []byte) []string {
 		case ast.KindLink:
 			out = append(out, string(n.(*ast.Link).Destination))
 		case ast.KindCodeSpan:
+			out = append(out, nodeText(n, src))
+			return ast.WalkSkipChildren, nil
+		}
+		return ast.WalkContinue, nil
+	})
+	return out
+}
+
+// codeSpans collects inline code-span contents in document order.
+func codeSpans(root ast.Node, src []byte) []string {
+	var out []string
+	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if entering && n.Kind() == ast.KindCodeSpan {
 			out = append(out, nodeText(n, src))
 			return ast.WalkSkipChildren, nil
 		}

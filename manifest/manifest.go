@@ -29,6 +29,20 @@ type Skill struct {
 	Dir         string `json:"dir"`
 	Hash        string `json:"sha256,omitempty"`       // first-16 sha256 of SKILL.md
 	TestPrompts string `json:"test_prompts,omitempty"` // path if present, else ""
+
+	// TestPromptsHash is the first-16 sha256 of the test-prompts file, or "" when
+	// there is none.
+	//
+	// Without it a manifest records that a skill has test prompts and nothing about
+	// what they say, so a SKILL.md can be rewritten while its behavioural assertions
+	// still describe the previous version and every gate in the family passes. The
+	// only thing comparing versions is Diff, and it had nothing to compare on.
+	//
+	// Empty means **absent**, not unknown. That distinction is load-bearing here in a
+	// way it is not for Hash: Diff treats an empty Hash as unknown-therefore-changed,
+	// and copying that rule would report every skill without test prompts as changed
+	// on every run.
+	TestPromptsHash string `json:"test_prompts_sha256,omitempty"`
 }
 
 // Delta is the difference between two manifests, as tree-relative skill locations.
@@ -41,6 +55,45 @@ type Delta struct {
 	Removed   []string // present in base, absent from cur
 	Changed   []string // in both, and not known to be identical
 	Unchanged []string // in both, with equal known hashes
+
+	// ChangedAxes says *what* changed, for each location in Changed. A location
+	// absent from this map is in Changed for a reason the axes do not cover.
+	//
+	// A map keyed by a subset of Changed, rather than a fifth slice or a richer
+	// Changed element. A fifth slice would break the totality promise above — a
+	// location whose prompts changed is also a location that changed — and turning
+	// Changed into a slice of structs would be a breaking change to a kernel type
+	// with four consumers, for an ergonomic gain. The subset relation is asserted by
+	// a test rather than left to this comment.
+	ChangedAxes map[string]Axes `json:"changed_axes,omitempty"`
+}
+
+// Axes reports which of a skill's two files moved.
+//
+// The zero value says neither, which is the honest reading of a location nobody
+// examined — and never appears in a Delta, because Diff records an entry only for a
+// location it placed in Changed.
+type Axes struct {
+	// Skill is true when SKILL.md's hash differs, or is unknown on either side.
+	Skill bool `json:"skill"`
+
+	// TestPrompts is true when the test-prompts file appeared, disappeared, or
+	// changed content. It is false when both sides have no test prompts at all —
+	// absence on both sides is not a change, and reporting it as one would make
+	// every skill without prompts permanently interesting.
+	TestPrompts bool `json:"test_prompts"`
+}
+
+// hashes are one location's two content fingerprints.
+//
+// prompts distinguishes "no test-prompts file" from "a file whose hash is unknown",
+// which skill deliberately does not: an unknown SKILL.md hash means the manifest was
+// written without one and the location must read as changed, whereas a missing
+// test-prompts file is an ordinary and stable state.
+type hashes struct {
+	skill      string
+	prompts    string
+	hasPrompts bool
 }
 
 // Build assembles a Manifest, sorting skills by slug so output is deterministic.
@@ -100,19 +153,30 @@ func Parse(data []byte) (Manifest, error) {
 // can assemble cur as a plain struct literal from a fresh scan rather than inventing a
 // value for a field that has no meaning before verification has run.
 //
-// Ensures: the four Delta slices partition the union of both manifests' locations; it
+// Ensures: the four Delta slices partition the union of both manifests' locations,
 //
-//	is pure and does not mutate either argument.
+//	and ChangedAxes is keyed by exactly the members of Changed; it is pure and does
+//	not mutate either argument.
+//
+// A skill whose test prompts changed is Changed even when its prose did not, which is
+// a behaviour change: before this, a manifest recorded that a test-prompts file
+// existed and nothing about its content, so the pair could drift apart with every
+// gate passing.
 func Diff(base, cur Manifest) Delta {
 	baseHashes, curHashes := index(base), index(cur)
 	var d Delta
 	for k, bh := range baseHashes {
 		ch, inCur := curHashes[k]
+		a := axes(bh, ch)
 		switch {
 		case !inCur:
 			d.Removed = append(d.Removed, k)
-		case bh == "" || ch == "" || bh != ch:
+		case a.Skill || a.TestPrompts:
 			d.Changed = append(d.Changed, k)
+			if d.ChangedAxes == nil {
+				d.ChangedAxes = make(map[string]Axes)
+			}
+			d.ChangedAxes[k] = a
 		default:
 			d.Unchanged = append(d.Unchanged, k)
 		}
@@ -162,17 +226,38 @@ func (d *Delta) Stale() []string {
 // which Diff already classifies as changed. Last-wins would let a duplicate hide a real
 // change; falling back to "unknown" reuses the rule that already governs a missing hash
 // rather than inventing a second one.
-func index(m Manifest) map[string]string {
-	out := make(map[string]string, len(m.Skills))
+func index(m Manifest) map[string]hashes {
+	out := make(map[string]hashes, len(m.Skills))
 	for _, s := range m.Skills {
 		k := location(m.Tree, s.Dir)
-		if prev, dup := out[k]; dup && prev != s.Hash {
-			out[k] = ""
+		h := hashes{
+			skill:      s.Hash,
+			prompts:    s.TestPromptsHash,
+			hasPrompts: s.TestPrompts != "" || s.TestPromptsHash != "",
+		}
+		if prev, dup := out[k]; dup && prev.skill != h.skill {
+			// Two skills at one location disagreeing about the hash: the location is
+			// not describable, so it reads as unknown and therefore changed.
+			out[k] = hashes{}
 			continue
 		}
-		out[k] = s.Hash
+		out[k] = h
 	}
 	return out
+}
+
+// axes reports what moved between two readings of one location.
+//
+// Requires: both sides describe the same location.
+// Ensures: pure. Skill is true when the SKILL.md hash differs or is unknown on
+// either side, matching Diff's existing rule. TestPrompts is true when the file
+// appeared, disappeared, or changed content, and false when neither side has one.
+func axes(base, cur hashes) Axes {
+	return Axes{
+		Skill: base.skill == "" || cur.skill == "" || base.skill != cur.skill,
+		TestPrompts: base.hasPrompts != cur.hasPrompts ||
+			(base.hasPrompts && base.prompts != cur.prompts),
+	}
 }
 
 // location identifies a skill by its directory relative to the tree it was recorded

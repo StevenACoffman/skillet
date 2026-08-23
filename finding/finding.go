@@ -8,6 +8,7 @@ package finding
 import (
 	"cmp"
 	"slices"
+	"strings"
 )
 
 // Severity levels. Only SeverityError is blocking.
@@ -49,9 +50,42 @@ type Diagnostic struct {
 	Action   Action   `json:"action,omitempty"`
 }
 
+// Unexamined is one aspect a check or critic did not look at, and why not.
+//
+// It exists because an empty findings list is ambiguous: a critic asked for three
+// categories of defect and returning none may mean it found none or may mean it never
+// looked, and a gate shipping on that silence cannot tell. Naming the gap converts an
+// unknown into a recorded one.
+//
+// Three properties, each of which the field is useless without.
+//
+// It is advisory, always. Nothing may block because an Unexamined entry is present: a
+// critic that can block by declaring a gap learns to declare none, which costs the gap and
+// the finding both. Result is shaped so that holds without anyone remembering it.
+//
+// It is testimony, not a derived fact. A critic saying it did not examine something is a
+// claim about its own behaviour, unverifiable from the outside, and worth exactly what the
+// critic is worth. This is what separates it from a skipped check, where code decided a
+// check did not apply and can say so mechanically; a caller must not read the two alike,
+// and they are deliberately different types for that reason.
+//
+// Reason is required, and Valid is the whole point of the type. "I did not examine X" with
+// no why is the boilerplate a required-but-unread field fills with: it satisfies the schema
+// and records nothing.
+type Unexamined struct {
+	Aspect string `json:"aspect"`
+	Reason string `json:"reason"`
+}
+
 // Result accumulates diagnostics from one or more checks.
+//
+// Unexamined is separate from Diagnostics rather than a kind of diagnostic: it carries no
+// severity, cannot block, and answers a different question -- not "what is wrong" but
+// "what was not looked at". A consumer walking Diagnostics to decide an outcome never sees
+// it, which is the intended structural guarantee.
 type Result struct {
 	Diagnostics []Diagnostic `json:"diagnostics"`
+	Unexamined  []Unexamined `json:"unexamined,omitempty"`
 }
 
 // Valid reports whether a is a known action. The zero value is not one: it is the
@@ -63,6 +97,19 @@ func (a Action) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// Valid reports whether u states both an aspect and a reason.
+//
+// Requires: nothing.
+// Ensures:  false when either field is empty or only whitespace; pure.
+//
+// A consumer parsing a critic's reply should reject the whole reply on an invalid entry
+// rather than drop it, matching how a malformed finding is already handled: an
+// unparseable answer must not advance anything on trust, and silently discarding half of
+// one is how a reply that says nothing passes for a reply that found nothing.
+func (u Unexamined) Valid() bool {
+	return strings.TrimSpace(u.Aspect) != "" && strings.TrimSpace(u.Reason) != ""
 }
 
 // Valid reports whether s is a known severity.
