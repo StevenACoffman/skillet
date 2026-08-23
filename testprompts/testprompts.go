@@ -66,6 +66,11 @@ type File struct {
 	// It is excluded from JSON: it describes the file that was read, not the document,
 	// and must not appear in what Write emits.
 	Rewrites []string `json:"-"`
+
+	// dropped is how many cases the container shape discarded on read. Unexported and
+	// read through DroppedCases: like Rewrites it describes the file as read rather than
+	// the document, so it must not appear in what Write emits.
+	dropped int
 }
 
 // Counts tallies cases by type.
@@ -138,7 +143,10 @@ func Parse(b []byte) (*File, error) {
 	if err := json.Unmarshal(b, &obj); err != nil {
 		return nil, fmt.Errorf("object: %w", err)
 	}
-	var rewrites []string
+	var (
+		rewrites []string
+		dropped  int
+	)
 	cases := obj.Tests
 	switch {
 	case len(cases) == 0 && len(obj.TestCases) > 0:
@@ -147,15 +155,17 @@ func Parse(b []byte) (*File, error) {
 	case len(cases) > 0 && len(obj.TestCases) > 0:
 		// Both keys populated: the reader has always preferred "tests" and dropped the
 		// rest, so writing back would delete cases the author can still see on disk.
+		dropped = len(obj.TestCases)
 		rewrites = append(rewrites, fmt.Sprintf(
 			`both "tests" and "test_cases" are present; the %d "test_cases" entries are dropped`,
-			len(obj.TestCases)))
+			dropped))
 	}
 	normalized, caseRewrites := normalize(cases)
 	return &File{
 		Skill:    obj.Skill,
 		Tests:    normalized,
 		Rewrites: append(rewrites, caseRewrites...),
+		dropped:  dropped,
 	}, nil
 }
 
@@ -171,6 +181,25 @@ func Write(path string, f *File) error {
 	}
 	return nil
 }
+
+// DroppedCases reports how many cases the file's container shape discarded, and is
+// non-zero only when a file carries both "tests" and "test_cases" -- the reader prefers
+// "tests", so writing back would delete cases the author can still see on disk.
+//
+// It exists so a caller can refuse that write without re-deriving the judgement. Parse
+// already knows which shapes destroy work; deciding it a second time from Rewrites would
+// mean substring-matching a human-readable sentence to decide whether to destroy data,
+// which breaks the first time the wording changes. Keeping the judgement in one module is
+// the point -- a future container shape that also drops cases is then refused by every
+// caller rather than recorded here and silently accepted elsewhere.
+//
+// A count rather than a bool because the callers that refuse also report: "the 3
+// test_cases entries are dropped" is actionable where a bare refusal is not. Zero means
+// nothing was dropped, so `> 0` is the predicate.
+//
+// Requires: f was returned by Parse or Load.
+// Ensures:  it reports the count for the file as read, not for the normalized document.
+func (f *File) DroppedCases() int { return f.dropped }
 
 // Behavioral returns the cases whose output quality is worth judging:
 // should_trigger and edge_case (a decoy has no good output to score).

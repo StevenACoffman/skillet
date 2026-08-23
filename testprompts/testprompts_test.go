@@ -1,6 +1,7 @@
 package testprompts_test
 
 import (
+	"encoding/json"
 	"maps"
 	"os"
 	"path/filepath"
@@ -400,5 +401,64 @@ func TestTallyStillCountsTheStandardThree(t *testing.T) {
 	})
 	if c := f.Tally(); c.Trigger != 3 || c.Decoy != 2 || c.Edge != 1 {
 		t.Errorf("Tally = %+v, want {3 2 1}", c)
+	}
+}
+
+// TestDroppedCasesAgreesWithTheDetectorItReplaces pins the predicate against the judgement
+// it removes a copy of. exegesis's refuseIfCasesWouldBeLost re-unmarshals the raw JSON into
+// a throwaway {Tests, TestCases []json.RawMessage} to find the same thing; if the two ever
+// disagreed, the duplication being removed was not duplication.
+func TestDroppedCasesAgreesWithTheDetectorItReplaces(t *testing.T) {
+	t.Parallel()
+	// The detector exegesis uses today, reproduced exactly.
+	theirs := func(b []byte) int {
+		var raw struct {
+			Tests     []json.RawMessage `json:"tests"`
+			TestCases []json.RawMessage `json:"test_cases"`
+		}
+		if json.Unmarshal(b, &raw) != nil {
+			return 0
+		}
+		if len(raw.Tests) > 0 && len(raw.TestCases) > 0 {
+			return len(raw.TestCases)
+		}
+		return 0
+	}
+	cases := map[string]string{
+		"both keys populated": `{"tests":[{"id":1,"type":"should_trigger","prompt":"p",` +
+			`"expected":"e"}],"test_cases":[{"id":2,"prompt":"q","expected_behavior":"f"},` +
+			`{"id":3,"prompt":"r","expected_behavior":"g"}]}`,
+		"only the legacy key": `{"test_cases":[{"id":1,"prompt":"p","expected_behavior":"e"}]}`,
+		"canonical":           `{"tests":[{"id":1,"type":"should_trigger","prompt":"p","expected":"e"}]}`,
+		"legacy key empty":    `{"tests":[{"id":1,"type":"should_trigger","prompt":"p","expected":"e"}],"test_cases":[]}`,
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f, err := testprompts.Parse([]byte(body))
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+			if got, want := f.DroppedCases(), theirs([]byte(body)); got != want {
+				t.Errorf("DroppedCases() = %d, the detector it replaces says %d", got, want)
+			}
+		})
+	}
+}
+
+// TestDroppedCasesLeavesTheHumanMessageAlone guards the split: the predicate adds a fact,
+// it does not replace the sentence a person reads.
+func TestDroppedCasesLeavesTheHumanMessageAlone(t *testing.T) {
+	t.Parallel()
+	f, err := testprompts.Parse([]byte(`{"tests":[{"id":1,"type":"should_trigger",` +
+		`"prompt":"p","expected":"e"}],"test_cases":[{"id":2,"prompt":"q","expected_behavior":"f"}]}`))
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if f.DroppedCases() != 1 {
+		t.Fatalf("DroppedCases() = %d, want 1", f.DroppedCases())
+	}
+	if len(f.Rewrites) == 0 || !strings.Contains(strings.Join(f.Rewrites, " "), "are dropped") {
+		t.Errorf("the human-readable rewrite went missing: %v", f.Rewrites)
 	}
 }
