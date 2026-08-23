@@ -259,3 +259,115 @@ func TestDiffOfAManifestWithItselfIsAllUnchanged(t *testing.T) {
 		t.Errorf("a manifest must not differ from itself: %+v", d)
 	}
 }
+
+// skillAt builds one manifest entry.
+func skillAt(slug, hash, prompts, promptsHash string) manifest.Skill {
+	return manifest.Skill{
+		Slug: slug, Dir: slug, Hash: hash,
+		TestPrompts: prompts, TestPromptsHash: promptsHash,
+	}
+}
+
+// TestDiffReportsWhichFileMoved. A manifest used to record that a skill had test
+// prompts and nothing about what they said, so a SKILL.md could be rewritten while its
+// behavioural assertions still described the previous version and every gate passed.
+func TestDiffReportsWhichFileMoved(t *testing.T) {
+	t.Parallel()
+	const prompts = "test-prompts.json"
+	cases := map[string]struct {
+		base, cur   manifest.Skill
+		wantChanged bool
+		want        manifest.Axes
+	}{
+		"only the prose changed": {
+			skillAt("a", "h1", prompts, "p1"), skillAt("a", "h2", prompts, "p1"),
+			true,
+			manifest.Axes{Skill: true},
+		},
+		"only the prompts changed": {
+			skillAt("a", "h1", prompts, "p1"), skillAt("a", "h1", prompts, "p2"),
+			true,
+			manifest.Axes{TestPrompts: true},
+		},
+		"both changed": {
+			skillAt("a", "h1", prompts, "p1"), skillAt("a", "h2", prompts, "p2"),
+			true,
+			manifest.Axes{Skill: true, TestPrompts: true},
+		},
+		"prompts appeared": {
+			skillAt("a", "h1", "", ""), skillAt("a", "h1", prompts, "p1"),
+			true,
+			manifest.Axes{TestPrompts: true},
+		},
+		"prompts disappeared": {
+			skillAt("a", "h1", prompts, "p1"), skillAt("a", "h1", "", ""),
+			true,
+			manifest.Axes{TestPrompts: true},
+		},
+		// The case that decides the zero value. Copying Diff's empty-means-unknown
+		// rule for Hash would report every skill without prompts as changed forever.
+		"no prompts on either side": {
+			skillAt("a", "h1", "", ""), skillAt("a", "h1", "", ""),
+			false,
+			manifest.Axes{},
+		},
+		"nothing changed at all": {
+			skillAt("a", "h1", prompts, "p1"), skillAt("a", "h1", prompts, "p1"),
+			false,
+			manifest.Axes{},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			d := manifest.Diff(
+				manifest.Build("t", "tree", []manifest.Skill{tc.base}, true),
+				manifest.Build("t", "tree", []manifest.Skill{tc.cur}, true),
+			)
+			if got := len(d.Changed) == 1; got != tc.wantChanged {
+				t.Fatalf("changed = %v, want %v (delta %+v)", got, tc.wantChanged, d)
+			}
+			if !tc.wantChanged {
+				if len(d.ChangedAxes) != 0 {
+					t.Errorf("an unchanged location has axes: %+v", d.ChangedAxes)
+				}
+				return
+			}
+			if got := d.ChangedAxes[d.Changed[0]]; got != tc.want {
+				t.Errorf("axes = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestChangedAxesIsKeyedByExactlyChanged is the totality promise, checked rather than
+// commented. A fifth slice would have broken it; a map keyed by a subset cannot, and
+// this is what says so.
+func TestChangedAxesIsKeyedByExactlyChanged(t *testing.T) {
+	t.Parallel()
+	base := manifest.Build("t", "tree", []manifest.Skill{
+		skillAt("same", "h1", "p", "p1"),
+		skillAt("prose", "h1", "p", "p1"),
+		skillAt("gone", "h1", "p", "p1"),
+	}, true)
+	cur := manifest.Build("t", "tree", []manifest.Skill{
+		skillAt("same", "h1", "p", "p1"),
+		skillAt("prose", "h2", "p", "p1"),
+		skillAt("new", "h1", "p", "p1"),
+	}, true)
+
+	d := manifest.Diff(base, cur)
+	if len(d.ChangedAxes) != len(d.Changed) {
+		t.Fatalf("%d axes for %d changed locations", len(d.ChangedAxes), len(d.Changed))
+	}
+	for _, loc := range d.Changed {
+		if _, ok := d.ChangedAxes[loc]; !ok {
+			t.Errorf("%q is Changed and has no axes", loc)
+		}
+	}
+	// And the four slices still partition the union.
+	total := len(d.Added) + len(d.Removed) + len(d.Changed) + len(d.Unchanged)
+	if total != 4 {
+		t.Errorf("the four slices hold %d locations, want the 4 in the union", total)
+	}
+}
