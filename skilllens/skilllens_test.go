@@ -214,3 +214,26 @@ func TestEmptyDocument(t *testing.T) {
 	}
 	_ = strings.TrimSpace("")
 }
+
+// TestCategoriesAreDistinct guards the one failure a constant block invites: a
+// copy-paste that gives two detectors the same category, silently merging their
+// findings for every consumer. The values themselves are a cross-repo contract and
+// are deliberately not asserted here -- restating a constant tests nothing.
+func TestCategoriesAreDistinct(t *testing.T) {
+	seen := map[string]string{}
+	for name, category := range map[string]string{
+		"CategoryNoFailureMode": skilllens.CategoryNoFailureMode,
+		"CategorySoftening":     skilllens.CategorySoftening,
+		"CategoryNoBoundary":    skilllens.CategoryNoBoundary,
+	} {
+		if category == "" {
+			t.Errorf("%s is empty", name)
+			continue
+		}
+		if prior, dup := seen[category]; dup {
+			t.Errorf("%s and %s are both %q; two detectors would report as one",
+				prior, name, category)
+		}
+		seen[category] = name
+	}
+}
