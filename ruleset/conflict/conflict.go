@@ -21,6 +21,19 @@
 // from differently-typeset copies of one source are compared on their words. Case is
 // preserved, per that package's decision.
 //
+// Every check here is a metalanguage check: its subject is the rules, never the thing the
+// rules are about. Severity divergence, level divergence and section collision are each a
+// property of two ruleset.Rule values, and none is a claim about the domain either rule
+// governs. Saying so is worth a paragraph because the mistake it prevents is natural: adding
+// an object-level check here because this is "the conflict package". An object-level
+// check -- two rules that disagree about the world -- needs a model of the world, which this
+// package does not have and must not acquire, since acquiring one would make every predicate
+// depend on a domain nobody can enumerate.
+//
+// gnosis reached the same boundary from the other side, declining to import this package for
+// claim predicates. What the two share is a shape, and a shape is followed rather than
+// imported.
+//
 // Everything here is pure.
 package conflict
 
