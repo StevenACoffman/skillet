@@ -20,6 +20,29 @@
 // different artifacts. Same boundary that keeps speclint's description cap here and the
 // cost of exceeding it in skillsaw.
 //
+// Validity scope: these were validated on one class of skill, and a consumer that runs them
+// over another can read an empty result as a pass when it is not one.
+//
+// The class is the discipline skill -- the failure being "skips a rule under pressure",
+// where a boundary section and an absence of hedging are the right signals. superpowers'
+// *Match the Form to the Failure* classifies three others, each wanting a different form of
+// guidance: output has the wrong shape (wants a positive recipe stating what the output IS,
+// in order), a required element is omitted (wants a REQUIRED slot in the template), and
+// behaviour depends on a condition (wants a conditional on an observable predicate).
+//
+// BlacklistSections is the exposed one, and the exposure is not symmetric. For a
+// wrong-shape skill a prohibition list is not merely absent evidence, it is the form their
+// head-to-head reports as *worse than no guidance at all* -- so a consumer scoring its
+// absence as a defect will recommend the change that harms the skill. FailureMechanisms and
+// SofteningPhrases are safer: the softening vocabulary is hedges (as appropriate, at your
+// discretion, if you prefer), none of which matches a conditional on an observable, so a
+// skill written as "if the response has a next cursor, page again" is not flagged.
+//
+// Nothing here classifies a skill's failure type, and nothing should: which class a skill
+// belongs to is a judgement, and a detector that guessed would put an uncalibrated
+// heuristic under a scoring dimension. This paragraph is the whole mitigation -- the
+// evidence says what it covers, and the caller decides what to do where it does not.
+//
 // Everything here is pure; the caller parses the document.
 package skilllens
 

@@ -1317,7 +1317,21 @@ flagged match… automated counts alone overstate both failure and success."*
   conditions*, which is what it measures, and not *encodes failure handling*, which is
   what its name suggests.
 
-- [ ] **Say what class of skill the three detectors are valid for.** `superpowers`'
+- [x] **Say what class of skill the three detectors are valid for.** DONE 2026-08-23 as a
+  package-doc paragraph: no code, no fourth detector, and nothing that classifies a skill's
+  failure type — that is a judgement, and a detector which guessed would put an
+  uncalibrated heuristic under a scoring dimension.
+  **Refined by measuring rather than warning uniformly: the exposure is `BlacklistSections`
+  alone.** `SofteningPhrases` was checked against its own vocabulary — thirteen genuine
+  hedges, none a conditional on an observable — and a row-4 skill written *"if the response
+  has a non-empty `next` cursor, page again"* scores dim 5 = 10 with no softening flag. A
+  uniform caution would have been easier to write and easier to ignore.
+  **The reachable harm is in skillsaw, not here, and is recorded there.** A doc comment
+  cannot reach the person reading a diagnosis. Reproduced with a purpose-built wrong-shape
+  skill: `dim 9 base = 2` for a missing boundary section makes it the weakest dimension, so
+  `diagnose` returns *"add counter-examples"* — the form superpowers reports as worse than
+  no guidance for that class.
+  Original entry: `superpowers`'
   *Match the Form to the Failure* classifies four baseline failure types and pairs each
   with the form of guidance that fixes it — and reports that the form fixing one
   **measurably backfires** on another. Their evidence is a head-to-head of their own,
