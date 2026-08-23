@@ -580,7 +580,23 @@ already owns.
   Consumers: adh (critic/judge/evaluation confidence vs closed-arc outcomes) and skillsaw
   (rubric/judge scores vs realized quality) — see their TODOs. Give it the same
   property-based + example test treatment `stats` warrants.
-- [ ] Candidate refinement — **`testprompts.File.Rewrites` can be printed but not
+- [x] **`testprompts.File.Rewrites` can be printed but not classified.** DONE 2026-08-23 as
+  `func (f *File) DroppedCases() int`, per the 2026-08-22 decision below.
+  **A count rather than the `bool` that decision named**, and the entry's own text is why:
+  it says *"or a count, if a caller wants to say how many"*, and the caller does. exegesis's
+  refusal reports how many cases sit under each key, which is actionable where a bare
+  refusal is not — a bool would have forced a second method the moment that message was
+  written. `> 0` is the predicate.
+  Unexported field, exported method: like `Rewrites` it describes the file as read rather
+  than the document, so an exported field would need the same `json:"-"` and the same
+  caveat, and a method inherits both.
+  **Verified against the detector it removes a copy of**, rather than against fixtures
+  alone: a test reproduces exegesis's `refuseIfCasesWouldBeLost` raw-JSON check exactly and
+  asserts the two agree on all four container shapes. If they had disagreed, what is being
+  removed was not duplication.
+  **exegesis cannot use it until the next release** — it pins by version with no `replace`,
+  so its `:1549` stays open until then.
+  Original entry: Candidate refinement — **`testprompts.File.Rewrites` can be printed but not
   classified.** It is `[]string` written for a human, which serves the "say what changed"
   case it was built for. But `exegesis tests --migrate` needs one rewrite treated
   differently from the others: a file carrying both `tests` and `test_cases` loses cases
