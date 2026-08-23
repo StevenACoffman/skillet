@@ -1,0 +1,100 @@
+# Deferred decisions and the conditions that would end them.
+#
+# Read by `bin/triggers.sh`, which runs `invigilator check` over consumer checkouts.
+# This file exists because four criteria in TODO.md fired without anyone noticing:
+# provenance's deletion condition, auditlog's promotion condition resolving negatively,
+# quotecheck's not-applicable outcome shipping, and an OKF trigger that turned out to be
+# unfireable by construction. Three of the four were mechanical. None had an observer.
+#
+# `kind` is required. A condition nobody can evaluate is legitimate — plenty are a
+# person's call — but it must say so and stay listed, because from the outside an
+# unfireable condition looks exactly like one that has not fired yet. That was the
+# OKF failure, and it is the one a report that only counts would miss.
+#
+# The argument for each hold lives in TODO.md. `condition` here is for the reader and
+# is never parsed; `where` is a locator, deliberately weak.
+#
+# Only deferred decisions belong here. An invariant — something that must stay true,
+# like "no package marked provisional has an importer" — is a different thing, and
+# modelling one as a hold makes `met` mean both "act now" and "all is well". That
+# check wants CI, not this file.
+
+[[hold]]
+id        = "bandit"
+kind      = "count"
+condition = "a 2nd consumer wants principled strategy selection under uncertainty"
+where     = "TODO.md — Deferred: a possible skillet/bandit"
+  [hold.count]
+  pattern   = "skillet/bandit"
+  include   = "*.go"
+  exclude   = "*_test.go"
+  threshold = 2
+  compare   = "at-least"
+
+[[hold]]
+id        = "set-hash"
+kind      = "count"
+condition = "a 2nd consumer needs to fingerprint a collection rather than one artifact"
+where     = "TODO.md — A set hash beside identity.Hash"
+  [hold.count]
+  pattern   = "identity.SetHash"
+  include   = "*.go"
+  exclude   = "*_test.go"
+  threshold = 2
+  compare   = "at-least"
+
+[[hold]]
+id        = "skip-record"
+kind      = "count"
+condition = "a 2nd consumer emits a check report carrying skipped checks; gnosis is the first"
+where     = "TODO.md — the Skip{Check, Reason} trigger, under the applicability decision"
+  [hold.count]
+  pattern   = "Skipped []Skip"
+  include   = "*.go"
+  exclude   = "*_test.go"
+  threshold = 2
+  compare   = "at-least"
+
+[[hold]]
+id        = "okf-fold"
+kind      = "manual"
+condition = "the 2nd repo that derives a trust tier from an actor list, not the 2nd that spells a tier name"
+where     = "TODO.md — OKF's trust fields, replacement trigger"
+# Was kind = "count" on pattern = "machine-confirmed", threshold 2. It reported met on
+# 2026-08-23 against a condition its own entry says has not fired, in two ways worth keeping:
+#
+#   1. A tier name is not a fold. Both matches were real code and neither derived anything:
+#      adh stores the answer in a TrustTier string, and gnosis's FoldTrust was an untracked
+#      file. Counting the vocabulary cannot detect use of the mechanism, and here the two
+#      diverge precisely because one repo has the words without the fold.
+#   2. The scan reads the working tree, so untracked work counts toward a threshold. That may
+#      be the right default for invigilator — a consumer mid-flight is still demand — but it
+#      means a hold can fire on a file that is in no commit.
+#
+# No pattern replaces it. "Derives a tier from an actor list" is a claim about what a function
+# does, and matching it needs the type-aware query invigilator's own TODO declines to build.
+# Manual, per this file's header: a condition nobody can evaluate is legitimate if it says so.
+
+[[hold]]
+id        = "subject-slot"
+kind      = "manual"
+condition = "a ruleset whose rules constrain named quantities to intervals or enumerations"
+where     = "TODO.md — DEFERRED 2026-08-15: the canonical form has no subject slot"
+
+[[hold]]
+id        = "span-offsets"
+kind      = "manual"
+condition = "a consumer that wants to SHOW a failure branch rather than count one"
+where     = "TODO.md — A blanked code span leaves unreadable evidence text"
+
+[[hold]]
+id        = "rewrite-kind"
+kind      = "manual"
+condition = "a 2nd caller that must act on a specific rewrite; only one of seven admits a distinct action"
+where     = "TODO.md — testprompts.File.Rewrites can be printed but not classified"
+
+[[hold]]
+id        = "adjudication-artifact"
+kind      = "manual"
+condition = "blocked on the ruleset format version, not on consumer count; three repos already specify it"
+where     = "TODO.md — Adjudication is a distinct artifact from detection"
