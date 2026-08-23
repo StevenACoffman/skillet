@@ -955,6 +955,17 @@ met before the knowledge-base tool exists at all.
   should spell them from the spec rather than from a sibling — because the match between the
   two existing implementations is luck.
 
+  **The `okf-fold` hold reported `met` on 2026-08-23 and was wrong; converted to `manual`.**
+  Two separate defects, and both are worth keeping because each would recur on a different
+  hold. **A tier name is not a fold**: the pattern was `machine-confirmed`, both matches
+  were real code, and neither derived anything — adh stores the answer in a `TrustTier`
+  string and gnosis's `FoldTrust` was an *untracked* file. Counting the vocabulary cannot
+  detect use of the mechanism, and here the two diverge precisely because one repo has the
+  words without the fold. **And the scan reads the working tree**, so untracked work counts
+  toward a threshold — a hold can fire on a file in no commit. Recorded in invigilator's
+  backlog, since whether that is the right default is its decision rather than this file's.
+  No pattern replaces it: *derives a tier from an actor list* is a claim about what a
+  function does, and matching it needs the type-aware query invigilator declines to build.
   **Neither has tripped the new trigger**, and that is the right call rather than a
   technicality: adh derives nothing, and gnosis has not built the fold. But the tier names
   matching across two independent implementations is luck, not agreement, and it is worth
@@ -1514,13 +1525,37 @@ appears in the open list and neither is checked by anything.
       is that it stays as **single-consumer code that happens to live in the kernel**, which
       is a standing exception to the promote-on-second-consumer rule rather than a pending
       promotion. Say so, and the hold stops looking open.
-- [ ] **The general fix, since this is now three for three.** `provenance`'s criterion,
+- [x] **The general fix, since this is now three for three.** `provenance`'s criterion,
       `auditlog`'s criterion, and `quotecheck`'s not-applicable box all fired without anyone
       noticing, and the OKF trigger turned out to be unfireable by construction. A
       `skillet triggers` report — each hold, its stated condition, and the current consumer
       count computed by grep across the family — is perhaps forty lines and would have
       caught all four. Until it exists, every criterion in this file is a note to a reader
       who has to already be looking for it.
+      **DONE 2026-08-22: `holds.toml` + `bin/triggers.sh`, over
+      `github.com/StevenACoffman/invigilator`.** Nine holds declared, eight after one was
+      withdrawn — see below. `bin/triggers.sh ROOT...` prints a verdict per hold and exits
+      2 when any condition is met; roots are arguments and there are no defaults, because
+      which checkouts constitute "the family" is a fact about one machine.
+      **The design point is not the counting.** Of the four failures this entry cites, only
+      three were countable — the OKF trigger was *unfireable by construction*, and no
+      amount of grepping would have found it. So every hold declares a `kind`, and a
+      condition with no mechanical test is `manual`: still listed, never resolved, visible.
+      An unfireable condition and one that simply has not fired look identical from
+      outside, and that is the failure the `kind` field exists to separate. Four of the
+      eight are manual today, which is the honest proportion and would have been invisible
+      in a report that only counted.
+      `unknown` is the zero verdict, so a failed scan or a mistyped root reads as *not
+      measured* rather than as *no consumers* — the same rule as `quotecheck.Unchecked`.
+      **It found something on the first real run.** `okf-fold` sits at 1 of 2: `adh` already
+      carries the tier vocabulary in `contextstore.Unit.Verified`, which is the divergence
+      recorded against the OKF entry above. One more repo deriving a tier trips it.
+      **And it caught a modelling error in its own first draft.** A ninth hold asserted "no
+      package is marked provisional", which reported `met` while meaning *all is well* —
+      making `met` mean both "act now" and "nothing to do". That is an **invariant**, not a
+      deferred decision; it was withdrawn, and `holds.toml` now says so. The CI guard it
+      wants — a provisional package that gains an importer must stop being provisional —
+      is still worth building and is not this.
 
 ## `manifest.Skill` Records Whether Test Prompts Exist, Not What They Say (2026-08-22)
 
@@ -1599,3 +1634,43 @@ test-prompts hash, and the `claims` promotion. What each turned up beyond its en
   pin by version with no `replace`, so none of it reaches them until this is cut — and
   the two consumer swaps for the category constants are already filed in exegesis and
   canonizer, waiting on it.
+
+## Two Items Transferred From gnosis's Backlog (2026-08-23)
+
+A re-read of gnosis's `TODO.md` on 2026-08-23 found fourteen entries filed against
+sibling repositories, nine of which were already in their real homes and five of which
+were nowhere. Two of the five are skillet's.
+
+The accounting is worth one line, because this repository is where the family's
+one-home rule is decided: gnosis was still carrying five `skillsaw` items as open that
+`skillsaw` had already closed. **A backlog that mirrors another repository's work goes
+stale in the direction that flatters.** The rule the kernel already applies to shared
+code applies to shared backlogs — one home, and a pointer from everywhere else.
+
+- [x] **Name the object/metalanguage split in `ruleset/conflict`.** DONE 2026-08-23, as a
+  paragraph in the package comment. Comment-only: 13 insertions, no code, and build, tests
+  and lint all unmoved. Original entry: It is a
+  **metalanguage** check: its subject is rules, not the thing the rules are about.
+  `conflict.Find` compares two `ruleset.Rule` values for severity divergence, level
+  divergence, and section collision — every one of those is a property of the *rules*,
+  and none is a claim about the domain either rule governs.
+  Saying so in the package comment costs a sentence and buys the thing a future
+  contributor will otherwise get wrong: adding an object-level check here because it is
+  "the conflict package". An object-level check — two rules that disagree about the
+  world — needs a model of the world, which is exactly what this package does not have
+  and must not acquire. gnosis reached the same conclusion from the other side when it
+  declined to import this package for claim predicates: what the two share is a shape,
+  and a shape is followed rather than imported.
+- [ ] **A shipped skill and a repo-governing skill are graded against one rubric, and
+  should not be.** `gentle-ai` keeps `internal/assets/skills/` — embedded, ships to
+  users — apart from `skills/`, which is repo-local and governs work on the tool
+  itself. The distinction is real and this family does not draw it: `speclint`'s rules
+  are written for a published artefact, and a repo-governing skill is closer to a
+  `CONTRIBUTING.md`.
+  Grading them against one rubric misjudges both. A shipped skill held to
+  `CONTRIBUTING.md` standards under-specifies what a consumer needs; a repo-governing
+  one held to `speclint`'s is penalised for omitting an audience it does not have. The
+  cheap version is a declared kind on `manifest.Skill` with the rubric reading it,
+  which is a smaller change than the two rubrics it avoids — and it is the same
+  shape as `Check.Applies`: state which convention applies rather than applying all of
+  them.
