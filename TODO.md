@@ -420,6 +420,10 @@ not yet tracked elsewhere.
   **provisional** in their package docs (discoverable via `go doc`), and kept — not deleted. Exit
   criteria recorded there: `auditlog` earns the "shared" designation on a 2nd consumer; `provenance`
   should be deleted if it is still unused at the next survey rather than carry unused public surface.
+  **Both criteria have since resolved and neither was noticed, because they were recorded inside a
+  ticked item.** See the open entry below (2026-08-22): `provenance` is still at zero importers
+  after three surveys, so its criterion says delete; `auditlog`'s resolved *negatively* — its one
+  plausible second consumer, gnosis, examined it and declined in writing.
 - [x] **A derived applicability predicate — "does this document execute anything?"** DONE
   (2026-08-14) as **`markdown.Doc.HasCodeBlock`**, not a `skilllens` function. Writing the
   interface comment first showed the entry's placement was wrong for two independent reasons.
@@ -485,7 +489,52 @@ not yet tracked elsewhere.
   artifact, flag on the inputs.** Dim 3 is a category error and gets a suppressing
   predicate; dim 8 is missing input and gets a flag with nothing suppressed. An
   `Applicability` that could express dim 8 would launder unfinished work as inapplicable.
-  Shape and consumers still to settle. Original framing:
+  **RESOLVED 2026-08-22: name the rule, promote no type.** The exit condition was evaluated
+  against the wrong population, and counting properly answers it — in the direction of not
+  building anything.
+  **`Convention` does not exist.** Zero occurrences across all six repositories; it is a
+  proposal in `exegesis/TODO.md` sourced from `coherence`. So the "two-member family" was
+  one shipped predicate and one hypothetical, which is a family of one.
+  **And the mature implementation was never counted, because it is not a predicate.**
+  gnosis shipped `internal/lint` with `Check{Name, Applies func(*Snapshot) (bool, string),
+  Run}`, a `Skip{Check, Reason}` record, and `Report.Skipped`. Its package doc states the
+  principle better than this entry did.
+  **`HasCodeBlock` is consumed four ways by two consumers, and every one of them is
+  deliberate.** skillsaw dim 3 branch 1 applies the penalty; branch 2 flags and never docks
+  (*"executes nothing to fail; judge the base"*, with the comment *"a mis-derived category
+  must not hide a real gap"*); skillsaw dim 4/8 sets `NeedsJudge` and only rewords the
+  message (*"likely not applicable"*); adh returns full credit plus *"the artifact executes
+  nothing to fail"*. Add gnosis's skip record and that is five sites. **All five carry a
+  reason. None is silent. Each suppresses a different thing** — a deduction, a whole check,
+  or nothing at all — and each has a comment reasoning about which.
+  **That convergence argues against a shared type rather than for one.** A type would have
+  to be generic over score, factor, diagnostic, and nothing-at-all, and the hard question —
+  *what do I do when it does not apply* — has a different right answer at each site,
+  already documented at each site. It also walks into this entry's own guard: dim 8
+  suppresses **nothing**, so a type expressive enough to cover it is a type that can launder
+  unfinished work as inapplicable. And gnosis's `Check` is parameterized on a gnosis type;
+  generalizing it needs generics or an interface, against the family's concrete-first
+  preference.
+  **The rule, lifted verbatim from gnosis's `internal/lint` package doc, which says it
+  best:**
+  > Applicability is derived, not declared, and a run states what it skipped. A check that
+  > silently declines to run is indistinguishable from a check that found nothing.
+  **With the corollary the five sites demonstrate and no type could carry:** *what* gets
+  suppressed is the consumer's choice — a deduction, a whole check, or nothing — but the
+  reason is never optional. **Suppressing nothing and only rewording is a legitimate
+  answer**, and it is the right one when the input is missing rather than the category
+  wrong. That sentence is what keeps dim 3 and dim 8 apart, which is the property this entry
+  said must survive any answer: a type blurs it, a rule states it.
+  **Placement:** this entry, plus a one-line obligation on `markdown.Doc.HasCodeBlock` —
+  a derived fact, and a consumer that suppresses anything on it must say so and why. Same
+  shape as the `skilllens` category constants decided the same day: the kernel publishes the
+  fact and names the obligation, the consumer keeps the policy.
+  **Trigger for the one thing that might still promote, and it is not `Applicability`:** the
+  pair `Skip{Check, Reason}` plus *a report carries one*. That earns sharing when **a second
+  consumer emits a check report** — today only gnosis does, since skillsaw emits scores and
+  adh emits factors. Narrow, observable, and unlike this entry's original exit condition it
+  names a thing that can be counted rather than a shape that has to be judged.
+  Original framing:
   **The exit condition may now be met — a fifth way has appeared.**
   That note said to wait "until a shape repeats". `exegesis/TODO.md` records a fifth answer to
   "does this check apply to this document", from `coherence`'s `OrphanEndpoints` meter: a
@@ -544,6 +593,40 @@ already owns.
   redesign. Recorded so the second caller that needs to *act* on a specific rewrite —
   rather than print them all — is recognised as the trigger, at which point a typed kind
   beside the message is the obvious shape. Found while building `--migrate` (2026-08-07).
+  **DECIDED 2026-08-22: a predicate, not a typed kind — and counting the kinds is what
+  decided it.** Verified against the code rather than the entry: `Parse` and `normalize`
+  produce **seven** distinct rewrite messages between them, not the handful the entry
+  implies — top-level array, legacy `test_cases` key, both keys populated, legacy
+  `expected_behavior`, id-is-a-string, id-is-not-a-number, and no-id.
+  **Exactly one of the seven drops cases**, and it is the one exegesis already refuses on.
+  A second is lossy in a weaker sense — renumbering a non-numeric id discards the original
+  string — but it reshapes rather than destroys, which is exegesis's own distinction:
+  *"the one rewrite which destroys work rather than reshaping it."*
+  So a typed kind would be a seven-member closed vocabulary in the kernel, six of whose
+  members exist so the seventh can be named, and every future legacy spelling would become
+  a kernel release where today it is an appended string. **The demand is one bit.**
+  **Add `func (f *File) DropsCases() bool`** (or a count, if a caller wants to say how
+  many). `Rewrites` stays `[]string` and stays human-facing, which is what it is good at.
+  A method rather than a field, because `Rewrites` is `json:"-"` and describes *the file as
+  read, not the document* — a bool field would need the same tag and the same caveat, and a
+  method inherits both for free.
+  **What this actually buys is removing a knowledge duplication, not a few lines.**
+  exegesis's `refuseIfCasesWouldBeLost` re-unmarshals the raw JSON into a throwaway struct
+  to detect the two-keys case, and its comment gives a good reason — *"pattern-matching a
+  human-readable string to decide whether to destroy data would break the first time that
+  wording changed"* — which is right, and is an argument for a predicate rather than for
+  the duplication. As it stands the judgement *which shapes destroy work* lives in two
+  modules, so a future shape that also drops data would be recorded by `Parse` and silently
+  not refused by exegesis. That is the §4 information-leakage red flag, and it is how the
+  two `softening` spellings happened.
+  **Deliberately not taken: returning the dropped cases** (`Dropped []Case`). Strictly more
+  useful *if* a caller wants to merge them, and nobody does — the need is to refuse. It is
+  a superset of the predicate and can be added later without breaking it, which is the
+  right shape for a maybe.
+  **And the entry's own trigger could not have fired.** It waits for "the second caller
+  that needs to *act* on a specific rewrite", but only one rewrite admits a different
+  action; the other six all mean *converted, carry on*. Waiting for a second is waiting for
+  something the vocabulary cannot produce.
 - [ ] Deferred — a possible `skillet/bandit` (Thompson Sampling: Beta-Bernoulli +
   Marsaglia-Tsang Gamma sampling, plus entropy/convergence diagnostics) if a 2nd consumer
   wants principled strategy selection under uncertainty. unified-thinking's
@@ -693,7 +776,7 @@ met before the knowledge-base tool exists at all.
   **Deliberately not done: absorbing `Source:` and `Scope:` into the block.** That is a second
   and larger migration, and doing it here would break the inert property above.
   Original entry:
-- [ ] **The canonical form cannot gain an optional field safely — fix this before adding
+- [x] **The canonical form cannot gain an optional field safely — fix this before adding
   one.** Found while weighing the subject slot, and independent of whether that is ever
   built: **an unknown marker line is folded into `Rationale` rather than rejected.**
   Verified against v0.16.0 rather than read from the code — parsing a rule carrying a
@@ -752,7 +835,7 @@ met before the knowledge-base tool exists at all.
   ruleset but never the reasoning that produced them, and its findings already come back
   as `finding.Diagnostic`. The residue routes there; nothing new is needed in skillet for
   it.
-- [ ] **A coverage record beside findings: what the critic did NOT examine.** Two consumers,
+- [x] **A coverage record beside findings: what the critic did NOT examine.** Two consumers,
   **both with a present defect rather than a conditional want** — which is what separates this
   from the OKF entry below.
   canonizer: `critic_prompt.md` asks for `unsupported`/`vague`/`duplicate` findings, so an
@@ -771,7 +854,34 @@ met before the knowledge-base tool exists at all.
   will learn to declare none.** That constraint is the whole design and must survive
   promotion. `finding.Result` is the natural home (19 references in canonizer alone), but the
   field must not be reachable by `Severity`.
-- [ ] **Extract the checkable claims a document makes about its own repo.** Two consumers,
+  **DONE in skillet 2026-08-22 as `finding.Unexamined`; consumers wait on a release.**
+  Four things changed on the way from this entry to the code, each from a rules pass.
+  **`examined` was dropped.** The value is in what was *not* looked at; what *was* is either
+  implied by the findings or is unverifiable testimony, and inviting a critic to claim total
+  coverage invites the one claim nobody can check. Dropping it also dissolved a constraint
+  the two-list shape would have needed — with one list, a name cannot be in both.
+  **The name changed.** `Coverage` collides with test coverage everywhere in this family,
+  and `limitations` is reserved for canonizer's authored, required, per-artifact one.
+  `Unexamined` names the thing and cannot be confused with either.
+  **The type earned its place, which it had not.** A struct of two string slices with no
+  behaviour is the header file this file refuses elsewhere. What justifies it is the
+  **required reason**: `{Aspect, Reason}` with `Valid()` rejecting either empty or
+  whitespace-only, because *"I did not examine X"* with no why is exactly the boilerplate a
+  required-but-unread field fills with. `Valid()` rather than a validated constructor
+  because the real construction path is `json.Unmarshal` of a critic's reply, which no
+  constructor intercepts.
+  **And the entry's own constraint got a structural guarantee instead of a discipline.**
+  *"Must not be reachable by `Severity`"* now holds because `Unexamined` sits beside
+  `Diagnostics` on `Result` and `HasBlocking` iterates diagnostics only. Pinned by
+  `TestUnexaminedCannotBlock`, checked against two planted defects — `Valid` ignoring
+  `Reason`, and `HasBlocking` folding gaps in — and it fails on both.
+  One distinction recorded in the doc so nobody unifies them later: this is **testimony**,
+  a critic's claim about its own behaviour, where gnosis's `Skip{Check, Reason}` is
+  **derived**, code stating mechanically that a check did not apply. Same shape, different
+  epistemic status, deliberately different types.
+  Consumer adoption is filed in canonizer and adh; both pin v0.18.0 and ride the same
+  release as the `skilllens` category constants.
+- [x] **Extract the checkable claims a document makes about its own repo.** Two consumers,
   both present: exegesis (a skill body naming `make verify` or `bw sync` makes a claim nothing
   checks; `lint` covers links and `skillsaw` dim 6 covers reachability, so **commands are the
   uncovered half**) and adh (`doctor` checks harness integrity and `context verify` checks
@@ -798,8 +908,75 @@ met before the knowledge-base tool exists at all.
   and has **zero importers anywhere** — its own doc reads *"provisional… a speculative
   extraction awaiting its first use. Delete it if it stays unused."* An OKF type promoted now
   ships with the same comment.
-  **Trigger: the first repo that actually stores trust metadata** — a stored artifact, not a
-  decision to adopt OKF someday.
+  **REVIEWED 2026-08-22: the decision stands for the storage types, and three things
+  changed.** Two of them strengthen it and one is a defect the first pass could not have
+  seen.
+
+  - **A third argument against the record types appeared, and it is the strongest one.**
+    gnosis's `okf` package now exists, and building it established that **re-encoding YAML
+    cannot round-trip** — every encoder normalises quoting and key order, and comments do
+    not survive a decode — so gnosis retains the frontmatter block *verbatim* and re-emits
+    it. A `Generated`/`Verified` struct here would therefore be **decode-only**: usable for
+    reading, useless for the write path the one real consumer actually has. The first
+    evaluation rejected the promotion on consumer count; it is also the wrong *shape*.
+  - **`skillet/provenance` still has zero importers** across all five consumer repos. The
+    cautionary precedent is unrefuted.
+  - **gnosis adopted `stale_after` (§5.5) with no shared type and no friction** — parsed in
+    `bundle`, stored on `Document`, read by `lint`'s `stale` check and by `show`. The
+    freshness half of "adopt OKF" answered itself empirically, which is evidence this was
+    never one question.
+
+  **The trigger as written fires too late, and gnosis proved it.** *"The first repo that
+  actually stores trust metadata"* is both ambiguous — gnosis stores `stale_after` today,
+  which is OKF §5.5 and not the trust family — and misaimed. `internal/gnosis/actor.go` is
+  built, tested, and shipped with a **closed three-kind enum** (`human:` / `agent:` /
+  `check:`) whose `ParseActor` rejects everything else, while SPEC §14.1 states it
+  implements OKF §5.3's fold verbatim. Two of OKF §7's three actor forms —
+  `<producer>/<version>` and `process:<id>` — do not parse. **That divergence was written
+  without touching trust metadata at all**, so a storage trigger could not have caught it.
+
+  **Replacement trigger: the second repo that classifies an actor or derives a trust
+  tier.** Storage is not the event; classification is, because that is where getting it
+  wrong is silent — a mis-classified tier reads as a stronger claim than it is.
+
+  **Two repos have now implemented OKF's tier vocabulary and neither derives it as
+  specified — which is the demand this entry called hypothetical, arriving as drift
+  instead.** adh's `contextstore.Unit.Verified` is a `TrustTier` *string* holding
+  `unverified` / `machine-confirmed` / `human-reviewed` directly, with `Valid()` and a
+  `Rank()` for routing tie-breaks. OKF §5.2's `verified` is a **list of `{by, at}`
+  events** and §5.3 folds the tier out of it. Same field name, same three tier names,
+  different type: adh stores the answer where the spec stores what the answer came from.
+  gnosis diverged the other way — it specified the fold correctly (§14.1) and built an
+  actor parser that rejects two of the three forms the fold must accept.
+
+  canonizer, the third referencing repo and the one this entry once called *"the nearest of
+  the three to real"*, has now been re-ranked in its own file: it is third rather than
+  nearest, it stores no tier, and its entry records that if it ever spells the tier names it
+  should spell them from the spec rather than from a sibling — because the match between the
+  two existing implementations is luck.
+
+  **Neither has tripped the new trigger**, and that is the right call rather than a
+  technicality: adh derives nothing, and gnosis has not built the fold. But the tier names
+  matching across two independent implementations is luck, not agreement, and it is worth
+  recording that the thing eventually promotable may be smaller than the fold — **the
+  three tier names and their order**, which is a five-line type both repos have now spelled
+  by hand. Hold anyway. A shared enum with two consumers and no shared behaviour is a
+  header file, and the family's rule is about behaviour.
+
+  **And when it fires, promote the fold, not the records.** §5.3's classification is a pure
+  function over a list of actor strings with a contract §7 states outright: *"Consumers
+  that classify trust key off the `human:` prefix."* Only `human:` needs recognising;
+  everything else is non-human by definition. That piece has no serialisation surface, no
+  round-trip problem, and a silent failure mode — which is the profile that earns a shared
+  definition. The record types do not follow it up.
+
+  **What gnosis should do locally, and it needs nothing from here:** two populations, two
+  treatments. Keep the closed enum for actors gnosis *mints* — the type comment defending
+  it is right, since a `check:` that could pass for a person makes §10.6.4's count wrong in
+  the flattering direction — and give OKF frontmatter a separate permissive read that only
+  asks *is this `human:`?*. Recorded in gnosis's TODO as a conformance test to write before
+  §14.1 is built, so the divergence becomes a decision with a reason rather than a surprise.
+
   **The spec details worth not re-deriving**, read from the spec rather than from the three
   TODO summaries:
   - §5.2 — `generated: {by, at}` and `verified: [{by, at}]`, distinct *because who wrote a
@@ -825,6 +1002,36 @@ met before the knowledge-base tool exists at all.
   who, when, which review) beside `SourceAnchor` in `ruleset`, so an adjudicated rule is
   *sourced differently*, not *unsourced*. Hold until the knowledge-base tool is real; one
   prospective consumer is not evidence for a type.
+  **REVIEWED 2026-08-22: still held, and the stated reason is now wrong.** Three things.
+  **There are three specifications of this, not one prospective consumer.** canonizer's
+  entry, this one, and gnosis's SPEC all describe it, and gnosis's uses the same sentence —
+  *"an adjudicated claim is sourced differently, not unsourced."* So "one prospective
+  consumer is not evidence" no longer describes the situation and cannot be the reason to
+  hold.
+  **The real blocker is L745, and this is its second asker.** A per-rule warrant cannot be
+  frontmatter, so it is a marker line — an **optional field on the canonical form**, which
+  that entry says cannot be added safely until the format version ships: an unknown marker
+  is folded into `Rationale` rather than rejected, so a file written by a newer version
+  silently mis-parses in an older one. The subject slot was the first asker and this is the
+  second, which strengthens the case for shipping the version reader alone and early.
+  **When it unblocks, the shape is deliberately smaller than gnosis's.** `ruleset.Rule`
+  gains `{By, At, Rationale}` with rationale required, and nothing else. No tiers, no
+  co-signers, no reversal links — those belong to gnosis's §10.6 authority model, and
+  putting them here would export one consumer's governance to four. gnosis keeps its own
+  warrant and will not use this one: its `Actor` is a deliberately closed three-kind enum
+  because §10.6.4 counts distinct humans, and a shared warrant with `By` as a plain string
+  is strictly weaker. **A canonizer-only type living in the kernel is `provenance` and
+  `auditlog` a third time**, both of which left this repo the same day this was reviewed.
+  Policy stays with the consumer: canonizer gates `Provenance` on *warrant present* where
+  the anchor is absent. Same split as the `skilllens` category names and the manifest
+  test-prompts hash — kernel carries the datum, consumer keeps the decision.
+  **One thing worth extracting now, at no cost, because it is not the type.** The shared
+  part is the *rule*: an adjudicated artifact is sourced differently rather than unsourced,
+  and a check that protects evidence must not reject the one artifact that cannot carry
+  any. Three repos derived that independently; writing it once is what stops a fourth
+  re-deriving the false rejection. gnosis's formulation is the sharpest and should be the
+  one quoted — *"a decision that weighed two published positions names both, even though
+  the decision appears in neither."*
 - [x] **`finding.Diagnostic` needs a who-acts axis.** DONE 2026-08-15: `Action` with
   `automatic` / `guided` / `human`, orthogonal to `Severity` and documented as such, since the
   whole risk is a reader collapsing them.
@@ -873,7 +1080,22 @@ met before the knowledge-base tool exists at all.
   `MinPassageWords`, which is why it survives contact with a real corpus. The
   knowledge-base ingestion tool is `quotecheck`'s 2nd consumer; that is what earns the
   promotion, not the survey.
-  - [ ] **The 2nd consumer needs a third outcome: not-applicable.** `gnosis`
+  - [x] **The 2nd consumer needs a third outcome: not-applicable.** **DONE in v0.18.0**,
+    and this box was left unticked. `quotecheck/status.go` carries `Status` with
+    `Unchecked` as the **zero value**, and `locate` returns it when `len(haystacks) == 0` —
+    which is exactly the state described below. `Finding.Missing()` is deliberately false
+    for an `Unchecked` finding, so a caller gating on it asks *"did the check find this
+    absent"* rather than *"did the check pass"*.
+    **Both downstream entries are now reconciled (2026-08-22).** `exegesis`'s *"when it is
+    promoted, expect a signature change exegesis does not need"* records that the prediction
+    held in both halves — the signature changed and exegesis did not need it. `canonizer`'s
+    three-way split records that its `unverifiable` row is already defined and shared, and
+    that the remaining work is canonizer's alone: map `Provenance` onto the three states.
+    Both now carry the same note about the **zero value**, which is the part worth
+    propagating — `Unchecked` being the zero means a `Finding` nothing populated reads as
+    *not checked* rather than *checked and clean*, so a caller that forgets to run the guard
+    fails closed. A port that spells the state as an absent value loses that.
+    Original entry: `gnosis`
     (`~/Documents/git/gnosis/SPEC.md` §4.3) admits sources it cannot archive — a PDF, an
     image, anything binary — as `referenced`: hash and URI recorded, no local text kept,
     deliberately no PDF extractor. For those, **there is nothing to compare a quote
@@ -915,6 +1137,52 @@ work. Three items, each checked against the code here as well as there.
   consumer declares its category set once, `finding` offers a validator, and an unregistered
   category is a programming error rather than a silent typo. Do not build until a second
   consumer has actually mis-spelled one; recorded so the option is visible when it happens.
+  **DECIDED 2026-08-22, and the trigger had already fired unnoticed.** It happened in the
+  worst available place: **exegesis emits `skilllens-softening` and canonizer emits
+  `softening` for the same `skilllens.SofteningPhrases` call** — one kernel detector, two
+  names. Measuring the rest settled the design, because the numbers point away from both
+  options this entry proposed. Across all thirty category values in the family there is
+  **not one same-word-different-meaning collision**, and the near-misses are all synonyms
+  (`unsupported` / `drift-unsupported`, `duplicate` in two repos, `conformance`). These
+  tools grade one conceptual domain, so when two reach for a word they usually mean the
+  same thing.
+  - **The closed enum is refused.** Thirty values with near-zero semantic overlap; the enum
+    would be a union of private vocabularies, and every new check anywhere would become a
+    kernel PR plus a release plus five bumps — taxing the activity that should be cheapest.
+    It also promotes policy (which failures exist) rather than mechanism.
+  - **The registration seam is refused, and this is the decisive one:** it would not have
+    caught the defect that occurred. `softening` and `skilllens-softening` are each validly
+    registered in their own repo. Registration catches drift *within* a consumer; the drift
+    was *between* consumers.
+  - **`Category` stays an untyped string**, because the risk is not proportional to shared
+    vocabulary. It is proportional to **shared mechanism**. Two tools naming their own
+    private domain failures differently is not a defect; two tools naming one kernel
+    detector's output differently is.
+  **The rule, which generalizes past this case: where the kernel owns the detector, the
+  kernel owns the category name.** `skilllens` now exports `CategoryNoFailureMode`,
+  `CategorySoftening`, and `CategoryNoBoundary` (2026-08-22, three constants and a
+  distinctness test — no `finding` import, so the return-spans-not-diagnostics boundary is
+  untouched). `quotecheck` is next by the same rule once gnosis and exegesis both run it;
+  `redlines`, `speclint`, and `neutrality` follow if they ever feed two consumers.
+  **Unprefixed, and deliberately.** A package prefix defends against homonyms — zero
+  observed — and manufactures synonyms, which is the one failure that did occur: a second
+  mechanism detecting the same class would have to spell it differently. It also puts
+  provenance into a field that classifies, the collapse `Severity` and `Action` are kept
+  apart to prevent, and it names a package that can be renamed. Twenty-seven of the thirty
+  existing values are unprefixed; exegesis's three were the outlier, not the convention.
+  **Polarity fixed at the same time, on canonizer's convention** (`no-anchor` = never
+  declared, `anchor-absent` = declared and not found). Two of the three detectors fire on
+  *absence*, so a category named for the dimension read as its opposite — `skilllens-failure`
+  meant *no failure handling was written*. The constants name the defect.
+  **Landing sequence, because consumers pin skillet by version and none carries a
+  `replace`:** skillet is done and green. Cut a release, then (1) exegesis swaps its three
+  literals for the constants — `skilllens-failure` → `CategoryNoFailureMode`,
+  `skilllens-boundary` → `CategoryNoBoundary` — and rewrites `lint_test.go:249`, which
+  groups on the `skilllens-` prefix and must switch over the constants instead; (2)
+  canonizer imports `CategorySoftening`, whose value is unchanged, so **its output does not
+  move** — a small confirmation the naming is right, since canonizer reached it
+  independently. No production code breaks either way: exegesis, skillsaw and adh have zero
+  `.Category` read sites. Filed in both consumers' backlogs.
 - [ ] **A set hash beside `identity.Hash`.** `identity.Hash` fingerprints one artifact;
   nothing fingerprints *a collection*. `agent-fuschia/gradecore`'s `suite_hash`
   (`gradecore/freeze.py:20`) is `sha256[:12]` over `"|".join(identities)`, and it exists to
@@ -939,3 +1207,395 @@ work. Three items, each checked against the code here as well as there.
   consumer and it moves here. Recorded in gnosis's TODO with the algorithm's guarantee
   ("every emitted claim stands on its own, or the cut is not made") so the design is not
   re-derived.
+
+## `superpowers` Deep Read (2026-08-22)
+
+Source: `~/Documents/agent-green/superpowers` at v6.3.0, read after the `agent-green`
+survey had filed it twice by size — once as a harness, once as a skill catalogue. It is
+neither: it is a **measurement discipline for skills**, and the closest peer this family
+has on the axis `skilllens` sits on. Written up in gnosis's `manifesto.md`.
+
+**Two defects below were found by running `skilllens` over that corpus, not by reading
+it.** A first pass at this section asserted a third defect — that the detectors count a
+skill's own quoted counter-examples as hits — and measurement refuted it:
+`SofteningPhrases` returns **zero** spans across all fourteen skills, because the
+softening vocabulary is hedges (`as appropriate`, `feel free`) and a rationalization
+table quotes *excuses* (`"Too simple to test"`), which is a different vocabulary.
+`BlacklistSections` fires on `## Red Flags` and `## Common Mistakes` exactly as intended.
+Recorded because the wrong version was plausible enough to have shipped, and because it
+is the failure `superpowers` warns about from the other side: *"Manually read every
+flagged match… automated counts alone overstate both failure and success."*
+
+- [x] **`markdown.Doc.Prose` does not blank a fenced code block nested inside an HTML
+  block, and `skilllens` reads the code as the skill's own instruction.** This
+  violates the guarantee stated in `skilllens.proseSpans`' own comment — *"markdown
+  has already blanked code blocks and spans, so a conditional inside a shell
+  transcript is not read as the skill's own instruction."*
+
+  Minimal reproduction, verified three ways. A fence on its own is blanked and
+  `FailureMechanisms` returns nothing. The same fence wrapped in `<Good>`…`</Good>`
+  with no blank line is **not** blanked, and the detector returns the example's own
+  code as a span. Adding a blank line after the opening tag restores the blanking and
+  the empty result.
+
+  Cause: with no blank line, goldmark takes the whole `<Good>`-to-`</Good>` region as
+  one HTML block, so the fence inside it is never a `FencedCodeBlock` and `prose()`
+  never reaches it. The blank line closes the HTML block and the fence parses
+  normally.
+
+  This is not contrived. `<Good>` / `<Bad>` wrappers around code examples are a
+  documented convention in `superpowers/skills/writing-skills/SKILL.md`, and the live
+  hit is `test-driven-development/SKILL.md:81` — a TypeScript example throwing
+  `new Error('fail')`, scored as failure-mode encoding on dims 3/5/9. The fix belongs
+  in `markdown`, not `skilllens`: `prose()` should blank fenced content wherever it
+  occurs, including inside an HTML block, since the whole point of `Prose` is that a
+  caller never has to think about this. Add the three-case table above as the
+  regression test.
+
+- [ ] **A blanked code span leaves unreadable evidence text.** The sentence *If (code
+  span) fails, stop.* yields a span whose `Text` is the word `If`, then a run of
+  spaces where the code span was, then `fail` — the match is semantically right and
+  the *evidence* is whitespace. Span length is preserved by
+  blanking, so the regex window is unaffected and no score changes; what breaks is the
+  thing `Span.Text` exists for. `skillsaw` and `adh` surface these spans to a person as
+  the justification for a penalty, and a justification made of spaces is not one.
+  Either carry the original substring alongside the matched prose, or record the span
+  offsets so a caller can re-slice the raw source. Low severity, and it only shows up
+  once somebody reads the output.
+  **RESOLVED 2026-08-22: build neither, document the hazard, pre-decide the mechanism.**
+  Two of this entry's claims were wrong, and measuring fixed the framing.
+  **The field has no readers.** The only consumer of `Span.Text` anywhere in the family is
+  `canonizer/internal/verify/verify.go:107`, and it reads a `SofteningPhrases` span — which
+  sets `Text` to the **vocabulary term it searched for**, never to matched source, so it
+  can never be blank. Section spans carry `sec.Title`, also clean. **Exactly one path can
+  produce the whitespace value** — `proseSpans` over the two failure regexes — and all
+  three of its consumers count and discard: exegesis tests `len(...) == 0`, skillsaw
+  switches on `Kind` to count branches, adh returns 1.0 on the first prose span. So the
+  claim that skillsaw and adh "surface these spans to a person" is false; neither reads
+  `Text` at all.
+  **And a recovered substring would not fix it anyway**, which settles the mechanism
+  independently of cost. The pattern allows forty characters between the conditional and
+  the failure word, so matches routinely end mid-word — the corpus run produced *"if the
+  skill prevents the right fail"* and *"When you have multiple unrelated fail"*. The window
+  is an arbitrary cut, so faithfully reproducing it reproduces something unusable.
+  **If a consumer ever appears, the answer is offsets**, and the reason is structural
+  rather than aesthetic: `Doc` does not carry the body, so carrying the substring would
+  mean either a `Body` field — a second full copy of every source, since `Prose` is already
+  one — or a signature change across all three detectors. `FindAllStringIndex` costs
+  neither, and offsets let a caller widen to a sentence boundary, which a fixed match
+  cannot.
+  **Landed instead, at no behavioural cost:** the hazard is now stated on `Span.Text`'s doc
+  comment with the mechanism pre-decided, and `markdown.TestProsePreservesOffsets` pins the
+  precondition any future offset work depends on — that `prose()` copies and masks in
+  place, so `Prose` is byte-offset-identical to the source. That property was an
+  undocumented accident of implementation that three tools would silently inherit; the test
+  was checked against a planted defect (rebuild the buffer instead of masking it) and fails
+  on it, so it is a control rather than an assertion.
+  **Trigger:** the first consumer that wants to *show* a failure branch rather than count
+  one.
+
+- Note, not a work item, and the honest limit of the approach: **methodology prose about
+  failure scores as failure-mechanism encoding.** Real hits from the corpus run — *"If you
+  didn't watch the test fail"*, *"If the control doesn't exhibit the fail[ure]"*, *"if the
+  skill prevents the right fail[ures]"* — are statements *about* testing, not branches
+  saying what to do when something breaks, and `(if|when)\s.{0,40}(fail|…)` cannot tell
+  them apart. It inflates dims 3/5/9 in the flattering direction on exactly the skills
+  most likely to discuss failure as a subject. No fix is proposed: distinguishing them
+  needs intent, intent needs a model, and the package is pure by charter. Worth one
+  sentence in the package doc so a consumer knows the signal is *mentions of failure
+  conditions*, which is what it measures, and not *encodes failure handling*, which is
+  what its name suggests.
+
+- [ ] **Say what class of skill the three detectors are valid for.** `superpowers`'
+  *Match the Form to the Failure* classifies four baseline failure types and pairs each
+  with the form of guidance that fixes it — and reports that the form fixing one
+  **measurably backfires** on another. Their evidence is a head-to-head of their own,
+  not a citation: *"the prohibition arm produced clearly more of the unwanted content
+  than the recipe arm (fully separated distributions), and trended worse than even the
+  no-guidance control."*
+
+  Their four rows, in order: *skips a rule under pressure* wants a prohibition plus a
+  rationalization table and red flags, and is spoiled by soft guidance. *Complies but
+  the output has the wrong shape* wants a positive recipe stating what the output IS,
+  in order, and is spoiled by a prohibition list. *Omits a required element* wants a
+  REQUIRED slot in the template, not prose reminders. *Behaviour depends on a
+  condition* wants a conditional on an observable predicate, not an unconditional rule
+  with exemption clauses bolted on.
+
+  Row one is the discipline-skill case the SkillLens rubric was validated on, and it is
+  where a boundary section and an absence of hedging are the right signals. For rows
+  two through four they are not, and a prohibition can be worse than silence. The
+  package already draws the correct line on *policy* — *"return the located evidence
+  and let each consumer decide what it means"* — and says nothing about **validity
+  scope**, so a consumer can run all three over a reference skill and read three empty
+  results as three passes. Package doc, not code, and no fourth detector.
+
+- Deliberately NOT adopted: `superpowers`'s `persuasion-principles.md`, which grounds an
+  Authority-first recommendation in Meincke et al. (2025), *"Call Me A Jerk: Persuading AI
+  to Comply with Objectionable Requests"* (33% → 72% compliance). By its own title that
+  study measures defeating refusal training, not improving process adherence, and
+  transferring the effect size is the uncalibrated-heuristic class this repo already
+  rejected family-wide in the unified-thinking survey above. Their own wording tests are
+  better evidence and one level closer to the task; those are what the entry above cites.
+
+- Held for a 2nd consumer: **variance across repetitions as a bindingness metric** —
+  *"When guidance lands, reps converge on the same shape. Five different interpretations
+  across five reps means the wording isn't binding."* `stats` and `calibration` hold the
+  machinery. The one prospective consumer is `skillsaw`, and it is recorded there.
+
+## Commissioned Gap Report — Checked (2026-08-22)
+
+Source: `~/Documents/agent-green/FPF/skillet_topten.md`, ten proposed gaps with Go
+implementation plans, one of seven such files covering the family. Checked against this
+codebase rather than filed, per the discipline the `hindsight` summary review established:
+**a commissioned survey is a claim to be checked, not a finding to be filed.**
+
+**Nothing from it lands here, and the reason generalises.** All seventy findings across the
+seven files cite one of two documents, and the larger one — `detailed-corpus-relevance.md`
+— is a **re-survey of the same 144 repositories** this family already absorbed
+(`agent-blue`/`fuschia`/`green`/`magenta`/`purple`/`red`), naming the same sources:
+`llmwiki`, `coherence`, `katalyst`, `qvr`, `stringer`, `4x`, `agentsys`, `ailloy`,
+`skillex`, `mdm`. So the findings are largely **this family's own recommendations,
+re-derived from the same corpus and re-presented as defects in the tools that already
+implemented them.** The tell is that the citations point at a survey rather than at code.
+
+The four items aimed at this repo, and why each was refused:
+
+- **`FixClass` on `finding.Diagnostic`** — `Action` already is the fix class:
+  `automatic` / `guided` / `human`, documented as *"who can close a finding"*, with the
+  zero value meaning nobody classified it. The proposal's two values are a strict subset
+  of three that exist, and its glossary is inverted (it defines `assisted` as fully
+  automated). Refused as a duplicate axis.
+- **`Certainty` on `finding.Diagnostic`** — the same axis a third time. `agentsys`'s
+  HIGH/MEDIUM/LOW maps one-to-one onto `Action`'s three values. **This one was worth
+  chasing**: gnosis's SPEC §16.1 proposed it too, describing `Diagnostic` without `Action`
+  and arguing that severity does not say who acts. Severity does not and `Action` does, so
+  §16.1 has been corrected — the mapping table is now in that section, `certainty` is kept
+  only as a *rule about when `Action` may be set* rather than as a field, and the
+  `findings` schema drops both columns for `action`.
+- **Age-based confidence decay in `stats`/`timeseries`** — decay curves are already
+  rejected family-wide as an uncalibrated threshold, recorded against FPF's C.27 in
+  gnosis's backlog. The proposal supplies a half-life parameter and no way to calibrate it.
+- **A SQLite `evidence` package with `sources(uri, content_hash, body BLOB)`** — this is
+  gnosis's tier 0, in the wrong repository. skillet is domain code with **zero**
+  `database/sql` imports and a scope boundary that says so; gnosis already stores bytes at
+  `evidence/text/<sha[:2]>/<sha><ext>` and one immutable record per source version at
+  `evidence/fetch/<h[:2]>/<h>.json`. The proposal is a description of `llmwiki`'s schema —
+  including its `internal/db/db.go` path, which exists in `llmwiki` and not in gnosis —
+  offered as a fix for a defect gnosis was built to avoid.
+
+Two more were checked and are simply wrong about the code: `skilllens` *"does not inspect
+for actionable specificity"* (that is `SofteningPhrases`; the package doc names the
+dimension), and `frontmatter` *"bypasses schema validation"* (that is `speclint`, which is
+the reason `frontmatter` only splits). The remaining two — parameterised rule templates via
+`text/template`, and an `[AUTHORITY:Role]` block in the canonical form — both mutate the
+canonical form, and the second walks directly into the open defect above: **an unknown
+marker line is folded into `Rationale` rather than rejected.** Adding a field before that is
+fixed is the specific thing that entry warns against.
+
+- Worth keeping as a method note rather than a work item: **a re-survey of an absorbed
+  corpus reliably produces the absorbed recommendations as fresh gaps**, and no amount of
+  depth in the re-survey prevents it, because the corpus genuinely does contain those ideas.
+  The cheap discriminator is where a finding's evidence points. A finding citing *the code
+  it claims is defective* can be checked in one grep; a finding citing a survey cannot be
+  checked at all without redoing the work. Ask for the former.
+
+### Round Two, and What Asking for Code-Reality Verification Actually Bought
+
+A second round arrived the same evening (`FPF/*_todo.md`, 19:05, against `*_topten.md` at
+15:30). It is much shorter — four concrete findings across seven files rather than seventy —
+and each now carries a **Code-Reality Verification** line, which is exactly the discriminator
+the note above asked for. Checked again, and the result is worth recording because it is not
+the one the improvement predicts.
+
+**The verification line reads: *"Confirmed via `git diff HEAD` and `TODO.md`."*** Neither
+half does what it claims. `git diff HEAD` shows uncommitted working-tree changes, which
+cannot establish whether a feature exists — a clean tree produces no output whatever the
+code contains. And `TODO.md` is a backlog, not code.
+
+So the second clause is the mechanism, and it explains the result exactly: **the findings
+that survived are the ones already written in the backlogs.** All three concrete gaps are
+restatements of existing entries, *including the corrections made to the first round*:
+
+| File | Finding | Already at |
+| ---- | ------- | ---------- |
+| `skillsaw_todo.md` | externalise the rubric, TOML not JSON, fail closed | `skillsaw/TODO.md`, which already credits `skillsaw_topten.md` Gap 1 and derives both those constraints itself |
+| `canonizer_todo.md` | map `Provenance` onto three states | `canonizer/TODO.md`, as a **three-way** split with the states named, and already noting the `quotecheck` v0.18.0 prerequisite is met |
+| `exegesis_todo.md` | artifact drift gate, diff-scoped | `exegesis/TODO.md`, under a heading reading *"Commissioned Gap Report — One Item Survives"*, which also records why the first round's mtime proposal fails |
+
+The corrections are the tell. Round one proposed JSON and an mtime comparison; those were
+refused *here*, in these files, with reasons. Round two proposes TOML and a diff-scoped
+check. A report cannot independently arrive at a correction whose only written statement is
+the backlog it read.
+
+**The method note therefore needs a second clause.** Asking a finding to cite code is
+necessary and not sufficient, because *"I checked the repository"* can mean reading the
+backlog, and a backlog is where this family writes down its conclusions. The stronger form:
+
+> **Verification must name the symbol, file, and line it inspected, and a finding whose
+> evidence is the backlog is a finding the backlog already has.** The four "no gaps found"
+> verdicts in round two are the honest output of exactly this process, and they are its most
+> accurate part.
+
+- Worth recording separately, because it is checkable and it is the reason nothing from the
+  addenda was taken: **the "Systems-Thinking & Cybernetic Mappings" citations do not survive
+  a lookup.** `canonizer_todo.md` §1 and `steve-skill-market_todo.md` §1 cite an *identical*
+  list of source lines — same five, same trailing "and 2 other articles" — for two unrelated
+  recommendations. And the lines are mislabelled: 123–124 of `book_corpus_findings.md`, given
+  as `cloudstrategy_book.md` and `eip_book.md`, are extracts from Russell's *A History of
+  Western Philosophy* ("the terror of cosmic loneliness"; the Pythagorean "ethic which
+  praised the contemplative life"), and 187/201, given as agile-organisation posts, are
+  `cli-guidelines.md`. A third item cites "65 other articles" for the proposition that
+  backend and frontend systems have different performance profiles.
+  This is the failure gnosis's whole evidence apparatus exists to make impossible, arriving
+  as a document *about* this family's tooling: a citation that names a source, points at a
+  line, and does not support the claim — and that survives review because nobody looks up
+  the line. It is the best specimen of the problem anyone has handed us, and it is recorded
+  in gnosis's manifesto as one.
+
+## Two Provisional Packages, Both Criteria Resolved (2026-08-22)
+
+Recorded because these were surfaced in review on 2026-08-22, stated as "the criterion has
+fired and the decision is unmade" — and then **not written down**, which is the failure the
+same review had just named two paragraphs earlier: *promote-on-second-consumer is a good
+rule and it has no observer.* Both exit criteria live inside a `[x]` item above, so neither
+appears in the open list and neither is checked by anything.
+
+- [x] **Delete `provenance`. Its own criterion says so and has said so for three surveys.**
+      **DONE 2026-08-22** — `git rm -r provenance`, plus its row in the README package table.
+      Build, vet, test and `golangci-lint run ./...` clean afterwards, and no consumer needed a
+      change because there were none. Recorded for the release notes: an exported package left
+      a published module, which is permitted at v0.x and should still be a line rather than a
+      silent removal. The OKF entry above still cites it as a cautionary precedent; that
+      argument survives the package as history and the citation now reads as past tense.
+      The exit criterion recorded 2026-08-05 is *"deleted if it is still unused at the next
+      survey rather than carry unused public surface"*, and the package doc repeats it —
+      *"a speculative extraction awaiting its first use. Delete it if it stays unused."*
+      Measured 2026-08-22: **zero importers across all five consumer repos**, zero internal
+      use in skillet, not wired into skillet's own modelith render workflow, and its only
+      importer is `provenance_test.go`. Three surveys have passed since the criterion was
+      set (agent-fuschia 08-18, agent-green 08-21, the deep reads 08-22). 168 lines of
+      production code and 64 of test.
+      **Nothing found in favour of keeping it.** The one thing that might have — that
+      skillet is itself authored with modelith, and this package was generalized from
+      modelith's vendored header — does not hold: skillet's own render path does not use it.
+      Two notes for whoever runs `git rm`. It is a **public package in a published module**,
+      so the survey covers this family and not the internet; that is acceptable at v0.x, and
+      worth one line in the release notes rather than a silent removal. And the OKF entry
+      above cites `provenance` as its cautionary precedent — the argument survives the
+      package as history, but the citation should say "deleted 2026-08-22" so a later reader
+      does not go looking for it.
+- [x] **Decide what `auditlog`'s resolution means, because it resolved the other way.**
+      **DECIDED and DONE 2026-08-22: it goes home to its consumer.** The entry below reasoned
+      toward keeping it as a recorded standing exception; the better answer is that a
+      single-consumer package in a shared kernel is surface every other consumer pays for and
+      none of them uses, and "standing exception" is how that surface becomes permanent.
+      Moved verbatim to `skillsaw/internal/auditlog` — it had **zero skillet dependencies**
+      (stdlib only), so the move was a copy, three import repoints, and a `gofmt`. skillsaw
+      builds, tests and lints clean and no longer imports it from here; skillet does the same
+      with the package gone. Its doc now records why it left and that promoting it back is the
+      right move if a second tool ever wants an experiment log — which is cheap precisely
+      because it stayed a clean stdlib-only unit.
+      **The general lesson, which is the one worth keeping:** `auditlog` and `provenance` were
+      both extracted on the guess that a second consumer would appear. Neither did, over five
+      months. The promote-on-second-consumer rule exists to prevent exactly this and both
+      predate it being applied consistently; the rule's converse — *demote on second survey
+      without one* — had been written down for `provenance` and never for `auditlog`, which is
+      why one had a criterion to fire and the other had to be reasoned from scratch.
+      Its criterion was *"earns the 'shared' designation on a 2nd consumer"*, which reads as
+      a wait-for-evidence hold. The evidence arrived and said no: gnosis considered it for
+      the mutation-row job and **declined in writing** — SPEC §15 records *"an earlier draft
+      named `skillet/auditlog` for this and that package is the wrong shape — it reads
+      `results.tsv`, nine columns describing an optimization experiment."* One consumer
+      (skillsaw's `cmd/history`, 3 files) and a documented refusal from the only candidate is
+      a different state from "still waiting", and the criterion has no branch for it.
+      Not the same answer as `provenance` — `auditlog` is *used*, so the unused-surface
+      argument does not apply, and it should almost certainly stay. What needs writing down
+      is that it stays as **single-consumer code that happens to live in the kernel**, which
+      is a standing exception to the promote-on-second-consumer rule rather than a pending
+      promotion. Say so, and the hold stops looking open.
+- [ ] **The general fix, since this is now three for three.** `provenance`'s criterion,
+      `auditlog`'s criterion, and `quotecheck`'s not-applicable box all fired without anyone
+      noticing, and the OKF trigger turned out to be unfireable by construction. A
+      `skillet triggers` report — each hold, its stated condition, and the current consumer
+      count computed by grep across the family — is perhaps forty lines and would have
+      caught all four. Until it exists, every criterion in this file is a note to a reader
+      who has to already be looking for it.
+
+## `manifest.Skill` Records Whether Test Prompts Exist, Not What They Say (2026-08-22)
+
+Found while deciding who owns the prose↔test-prompts coupling gate (exegesis and skillsaw
+both had a claim; the answer turned out to be neither, quite). The gate needs one fact this
+package does not record.
+
+- [x] **Hash the test-prompts file beside the skill's, and give `Delta` the axis.**
+      `manifest.Skill` is `{Slug, Dir, Hash, TestPrompts}` where `Hash` is the first-16
+      sha256 of `SKILL.md` and `TestPrompts` is *"path if present, else empty"*. So a
+      manifest can see a skill's prose change and is **structurally blind to whether its
+      test prompts changed with it** — it records that the file exists and nothing about
+      its content.
+      That asymmetry is the whole reason the coupling defect is invisible: a `SKILL.md` can
+      be rewritten while its behavioural assertions still describe the previous version,
+      and every gate in the family passes, because the only thing comparing versions is
+      `manifest.Delta` and it has nothing to compare on. **One field closes it**, and
+      `Delta` then distinguishes *both changed* from *only the skill changed*.
+      **Why here rather than in a consumer.** Two tools build manifests (`manifest.Build`
+      takes a `tool` parameter precisely so exegesis and skillsaw share it), so the fact
+      belongs to the shared entry rather than to whichever tool notices first — and once it
+      is here, the coupling check is available to anything holding two manifests, not just
+      to the tool that asked. `Delta`'s doc already promises totality (*"every location
+      present in either manifest appears in exactly one of the four slices"*); adding an
+      axis must preserve that, which is the one design constraint.
+      **What this deliberately avoids.** The obvious implementations are filesystem mtimes
+      and `git diff --name-only`, and both were rejected: git does not preserve mtimes, so
+      an mtime check reports nothing on CI and everything after a rebase, and shelling out
+      to git puts an environment dependency inside a pure comparison. A content hash in a
+      manifest is what this package already is.
+      Consumer side is `skillsaw preflight`, filed there. exegesis owns none of it: it has
+      no baseline — it calls `manifest.Build` once and never `Diff` — and a snapshot cannot
+      see a drift by construction.
+
+## Four Items Built (2026-08-22)
+
+`markdown` fence-in-HTML, the canonical form's unknown marker, `manifest`'s
+test-prompts hash, and the `claims` promotion. What each turned up beyond its entry.
+
+- **A one-line fix was available and wrong.** Blanking the whole HTML block fixes the
+  fence and destroys `<Good>Always validate input.</Good>`, which is a real instruction
+  reaching `Prose` correctly today. Neither the entry nor the report that prompted it
+  mentions that case; it surfaced from asking what *else* lives in an HTML block. The
+  chosen fix — a second parse with the HTML block parser removed — keeps it, and there
+  is now a test for it.
+- **Measuring the blast radius was worth more than arguing about it.** The change to
+  `HasCodeBlock` looked like it would make skillsaw stricter for `<Good>`-wrapped
+  skills, which would have been a scoring change in another repo. Over 2200 real
+  `SKILL.md` files: **16 produce different `Prose` and zero flip `HasCodeBlock`.** The
+  coordination item that concern implied does not need writing.
+- **Half of the canonical-form entry was already built.** `readFormat` refuses a
+  `format:` newer than `FormatVersion` and its own comment says that is what the block
+  is *for* — so the cross-version half was closed and the entry did not know. Verified
+  before writing anything, and there is now a test pinning it. This is the third entry
+  in this family found stale by checking its premise first, and the pattern is
+  consistent: **an entry describing a defect is a claim about the code, and it ages.**
+- **A heuristic's error rate is measurable, so it was measured.** `claims` shipped its
+  first version, ran over 233 real skill bodies, and the head of the false-positive list
+  was `defer cancel()`, `go func()`, `getenv func(string) string` — Go statements whose
+  first token is a lowercase word. One rule removed the class. Reasoning about the
+  heuristic in advance would not have produced that list; running it did, in a minute.
+- **Two of `claims`' rules came from failing tests rather than from design.** `var Doc
+  struct` parsed as an invocation, and `x = 1` did. The uppercase rule that fixes the
+  first also loses `git push origin HEAD`, which is recorded as a test case so the price
+  stays visible instead of being rediscovered.
+- **`Delta`'s totality promise shaped the API.** A fifth slice was the obvious way to
+  report which file moved and would have broken it — a location whose prompts changed is
+  also a location that changed. A map keyed by a subset of `Changed` cannot, and the
+  subset relation is asserted rather than commented.
+
+- [ ] **The release now carries four changes and two package removals.** `auditlog`
+  moved to skillsaw and `provenance` is gone; no consumer imports either, verified by
+  grep across the family. Additive: `skilllens` category constants, `Doc.CodeSpans`,
+  `Skill.TestPromptsHash`, `Delta.ChangedAxes`, the `claims` package. Behavioural:
+  `Prose` blanks more, and `ruleset.Parse` now refuses an unrecognised marker. Consumers
+  pin by version with no `replace`, so none of it reaches them until this is cut — and
+  the two consumer swaps for the category constants are already filed in exegesis and
+  canonizer, waiting on it.
