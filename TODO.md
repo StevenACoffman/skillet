@@ -1725,6 +1725,35 @@ code applies to shared backlogs — one home, and a pointer from everywhere else
   `repo-govening` must not quietly buy lenient treatment. An alias table also manufactures
   synonyms, which the Category entry names as the failure that actually occurred, and it
   never shrinks. Vocabulary evolution belongs to a format version, which `ruleset` now has.
+  **DECIDED 2026-08-23: which rules each lineage keeps, measured rather than argued.** This
+  was the unwritten list the field had nothing to select without. Decomposing the redline
+  errors settles it, because they are not spread across the four rules — they are one rule
+  plus one input:
+
+  | redline rule                  | hand-written      | why                                                |
+  | ----------------------------- | ----------------- | -------------------------------------------------- |
+  | six RIA-TV++ segments         | **drop**          | methodology: how the skill was made, never claimed |
+  | quotation ceiling (150 words) | keep              | contract: constrains quotations, not provenance    |
+  | description states a trigger  | keep              | contract: about being loadable; also in `speclint` |
+  | `test-prompts.json` exists    | **not a redline** | completeness: an unauthored input, not a defect    |
+
+  `gh-cli`'s seven errors are **six missing segments plus one missing `test-prompts.json`**,
+  and `gh-cli`, `vale` and `unconventional-commits` trip the quotation ceiling and the
+  trigger rule **zero** times between them. So the two kept rules cost nothing to keep and
+  are not vacuous — they would fire if broken.
+  **The lineage field therefore selects one rule group, not a per-rule table.** That is a
+  much smaller thing to get right, and each rule now has a reason rather than a tag:
+  methodology travels with lineage, contract does not.
+  **`test-prompts.json` leaves the redline set rather than being dropped for hand-written
+  skills**, and the distinction matters: dropping it would convert *missing input* into *not
+  applicable*, which is exactly what skillsaw's **gate on the artifact, flag on the inputs**
+  rule forbids — a hand-written skill with no test prompts is not inapplicable, nobody has
+  written them. Its absence is already reported where it belongs: `skillsaw eval` flags
+  *"none of N behavioral case(s) specify checks; dim 8 cannot be scored"*. Blocking cannot
+  author the file; reporting can prompt someone to.
+  **Owed before the field ships:** decompose across all 48 no-RIA skills to confirm the
+  six-plus-one pattern holds and that no hand-written skill trips the quotation ceiling. If
+  one does, that rule's *keep* is confirmed by a violation rather than by zero.
   **Still not built, and the trigger is unchanged: a second checker that would branch on the
   field.** `Check.Applies`, cited below as the precedent, **does not exist in this module** —
   grep returns nothing — so building to it would be building to a shape that was never built.
