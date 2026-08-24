@@ -1757,9 +1757,13 @@ code applies to shared backlogs — one home, and a pointer from everywhere else
   **Still not built, and the trigger is unchanged: a second checker that would branch on the
   field.** `Check.Applies`, cited below as the precedent, **does not exist in this module** —
   grep returns nothing — so building to it would be building to a shape that was never built.
-  And nobody has written which rules each kind keeps: `speclint`'s description cap plausibly
+  **That list now exists for lineage** — the table above — so the missing-list objection
+  applies to **audience only**, and the wording below said "each kind" when it meant that
+  narrower thing. Corrected 2026-08-23 because read as written it retracts the decision two
+  paragraphs above it. For audience it still holds: `speclint`'s description cap plausibly
   survives for a repo-governing skill, its trigger-condition rule plausibly does not, and
-  until that list exists the field is a kind nobody branches on.
+  until that list exists **audience** is a field nobody branches on. Which is the recorded
+  reason lineage ships first.
   `provenance` is the completed cautionary case rather than a live one — carried tested with
   zero importers until v0.20.0 deleted it.
   **exegesis is where this fires**, and its `--check redlines` mixed-tree entry is still open
@@ -1778,3 +1782,113 @@ code applies to shared backlogs — one home, and a pointer from everywhere else
   which is a smaller change than the two rubrics it avoids — and it is the same
   shape as `Check.Applies`: state which convention applies rather than applying all of
   them.
+
+## One Field Declined, from Exegesis's Act-Statement Work (2026-08-23)
+
+- [ ] **`manifest.Manifest` has no field saying which act produced the verdict, and it
+  should not get one until a second tool can set it.** exegesis landed the human half of
+  `vac-protocol` §4 — every `verify` run now ends with *"structural gates only; semantic
+  replay not performed"* — and stopped short of the manifest field its own entry proposed,
+  `semantic_verification: "not-performed"`.
+
+  **The reason is not the release boundary, it is the value.** For exegesis the field is a
+  **constant**: exegesis is the structural half by charter and never performs semantic
+  replay, so the field can only ever hold one string. That is this file's own recorded
+  cautionary case — `provenance`, *"carried tested with zero importers until v0.20.0 deleted
+  it"* — and adding a one-valued field to a kernel type is how that happens again.
+
+  **The trigger is a tool that would set it to *performed*.** A semantic replayer or grader
+  in the family makes the field carry information; until then `StructureVerified` already
+  names its own axis, and what was missing was that nothing *said* "structure" excludes
+  quality — which a sentence fixes and a constant does not.
+
+  Note the asymmetry worth keeping: a **machine** reader still cannot learn this from the
+  manifest, only a human from the run output. That is a real gap and the honest price of not
+  encoding a constant. It becomes worth paying the moment the value can vary.
+
+## `redlines.checkTrigger` Does Not Recognise the Word "Trigger" (2026-08-24)
+
+Found from skillsaw, running `preflight --redlines` over 286 installed skills to pick a
+subject for an activation experiment.
+
+`checkTrigger` clears a description that contains any of six cues:
+
+```go
+for _, cue := range []string{"when", "whenever", "invoke", "reach for", "before ", "after "} {
+```
+
+**The list omits "trigger".** So a description opening `Trigger: user is using
+context.WithValue or asking about context keys` — the most explicit statement of a trigger
+condition available — is flagged as stating none. Confirmed directly against
+`redlines.Check`: that string yields the "description should state a trigger condition"
+diagnostic.
+
+- [x] **Add the word the check is named for.** Done 2026-08-24 — but **not the bare word**,
+  which was the obvious fix and the wrong one. "trigger" is a domain term, and *"a skill
+  about database triggers"* is precisely the anti-pattern this check exists to catch: adding
+  it would have traded a false positive for a false negative in a **blocking** check, which
+  is the worse direction, since a redline that lets bad skills through is one nobody notices
+  is broken.
+  The cues added are the declarative forms — `trigger:`, `triggers on`, `trigger signal` —
+  each observed in a real 286-skill corpus. Measured there: 122 descriptions contain
+  "trigger" at all and only 72 use it declaratively; the other 50 happen to clear on `when`
+  or `invoke`, so bare and declarative agree *on that corpus* — a property of the corpus,
+  not of the rule, and the hazard case is one skill away.
+  The test gained the case that matters most for a blocking check: `A skill about database
+  triggers.` **must still be flagged**. Verified by shortening the cue to the bare word,
+  which fails exactly that case.
+  **Confirmed in the field, not just in a unit test.** Rebuilding skillsaw against this
+  and re-running `preflight --redlines` over the same 286 skills takes the trigger redline
+  from **5 flags to 1** — the survivor being `matryer-decode-valid`, whose description
+  states no condition at all (*"Eliminate repetitive decode-then-validate boilerplate…"*)
+  and which independently failed two phrasings of skillsaw's adversarial corpus. Its staying
+  flagged is what makes the fix trustworthy rather than merely quieter.
+  One correction worth recording: four of the five were false positives, not three. I had
+  read `webapp-review` as borderline from its opening — *"Use to review a … pull request"* —
+  and reading the whole description shows an explicit `Trigger signals:` list further in.
+  Deliberately **not** widened to `use to`, `apply when` or similar: nothing in 286 skills
+  needs them, and each unmotivated cue weakens a blocking check. Original entry: `trigger` (which also covers `triggers on:`
+      and `trigger signal:`) and plausibly `use this skill`, `use for`, `apply when`.
+      Two of skillsaw's operator's 286 skills are affected —
+      `context-key-collision-prevention` and `option-configuration-patterns` — both of which
+      state a trigger in the clearest form and are told they do not.
+      **This is a redline, so it is `SeverityError` and blocking.** A false positive here
+      does not merely misreport: it rejects a well-written skill from a gate that exists to
+      reject badly-written ones, which is the direction that costs trust fastest.
+      The existing comment says the heuristic *"catches the 'a skill about X' anti-pattern
+      without over-flagging"*. Over-flagging is exactly what it does, and the fix is one
+      entry in a list — but the cue list is the kind of thing that wants a case both ways,
+      given it is blocking: a description stating a trigger that must pass, and an "a skill
+      about X" description that must still fail.
+
+## Mechanical Forms of Good Advice — Four Measured Instances (2026-08-24)
+
+Not a work item. A shape that has now been measured **four times in three repositories**,
+recorded once here because the next instance will be proposed in a fourth.
+
+Each began as advice that is *correct*, and failed as a check because the mechanical proxy
+selected on a **correlate** that the good case also exhibits — usually more strongly than the
+bad case does.
+
+| advice                                             | mechanical form                          | what it actually flagged                                                                                                                    |
+| -------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| "encode failure modes"                             | skilllens dim 9, counter-examples        | with `blacklist_empty_base = 2`, dim 9 is weakest, so `diagnose` recommends the form superpowers measured as worse than no guidance         |
+| "a description states a trigger, not a process"    | description contains an own-body heading | `zero-touch-production`, for "Do Not Use This Skill When" — a negative trigger condition the guidance asks for                              |
+| "a book skill has six RIA-TV++ segments"           | require all six of every skill           | `gh-cli`, `vale`, `unconventional-commits` — hand-written skills, 7 errors each about a format they never claimed                           |
+| "every instruction is backed by a working command" | resolve named commands                   | `mycmd install`, `myapp serve`, `deploy --reset` — deliberate placeholders in the CLI-design skills, which *should* name fictional commands |
+
+**The common mechanism:** the proxy measures a surface feature (vocabulary overlap, section
+presence, name resolution, heading count) that correlates with the defect in the bad case and
+correlates *at least as strongly* with correctness in the good case. Tightening a threshold
+does not separate them, because the two populations are not separated on that axis at all.
+
+**The test that catches it, and it is cheap:** before building a mechanical form of any
+advice, run the predicate over the corpus and **read what it flags, not how many**. All four
+were caught this way, and three were caught before any code was written. A count cannot
+distinguish "13 defects" from "13 correct skills"; only the identity of the flagged cases can.
+This is the same discipline as `holds.toml`'s `kind = "manual"` — when a condition will not
+reduce to a string, saying so is the honest declaration.
+
+**Corollary for reviewers:** "it is a string comparison, not a heuristic" is not evidence of
+safety. Two of the four were exact and deterministic. Exactness governs whether a check is
+*reproducible*, not whether it is *measuring the right thing*.
