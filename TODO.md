@@ -1787,6 +1787,43 @@ code applies to shared backlogs — one home, and a pointer from everywhere else
   **Owed before the field ships:** decompose across all 48 no-RIA skills to confirm the
   six-plus-one pattern holds and that no hand-written skill trips the quotation ceiling. If
   one does, that rule's *keep* is confirmed by a violation rather than by zero.
+
+  **MEASURED 2026-08-24 over 286 skills — the debt is paid, and two of the three claims do
+  not survive it.** 102 carry no RIA-TV++ segments, not 48; the earlier figure was a subset.
+  Decomposed by rule and lineage:
+
+  | lineage                | rule                         | count |
+  | ---------------------- | ---------------------------- | ----- |
+  | hand-written (no RIA)  | six RIA-TV++ segments        | 601   |
+  | hand-written (no RIA)  | frontmatter: disallowed key  | 47    |
+  | hand-written (no RIA)  | frontmatter: angle brackets  | 6     |
+  | hand-written (no RIA)  | quotation ceiling            | **2** |
+  | book-derived (has RIA) | quotation ceiling            | 64    |
+  | book-derived (has RIA) | frontmatter: angle brackets  | 2     |
+  | book-derived (has RIA) | description states a trigger | 1     |
+
+  **The quotation ceiling's keep is confirmed by violation, exactly as this entry asked
+  for.** Two hand-written skills trip it. A rule that never fires cannot be shown to work,
+  so this is the better outcome of the two the entry allowed for.
+
+  **The six-plus-one pattern does not hold.** 601 segment errors over 102 skills is the six,
+  but `test-prompts.json` never appears — that rule does not fire through
+  `preflight --redlines` at all — and **53 frontmatter errors** appear that the three-skill
+  sample never showed. The pattern is six-plus-frontmatter, not six-plus-one.
+
+  **And the frontmatter errors are evidence for the axis this entry set aside.** 43 of the
+  47 disallowed keys are one key, `user-invocable`, carried by 43 hand-written skills that
+  load and run correctly — all 285 are `[Enabled]` in Gemini CLI. So the runtime accepts a
+  key `speclint` rejects. That is *"graded against contracts it never claimed"* on the
+  **audience** axis, at a scale the lineage evidence was chosen over. The entry's reasoning
+  for shipping lineage first — "where the seven-error case lives" — was measured before
+  these were counted; the seven-error case is real, and it is not the only one.
+
+  **One number here is stale by a day and re-measured.** The entry recorded the trigger rule
+  firing zero times. `redlines.checkTrigger` gained the declarative cues on 2026-08-24, and
+  it now fires once across the corpus — `matryer-decode-valid`, which states no condition at
+  all. The rule is still not vacuous and still cheap to keep; the figure simply predates the
+  fix.
   **Still not built, and the trigger is unchanged: a second checker that would branch on the
   field.** `Check.Applies`, cited below as the precedent, **does not exist in this module** —
   grep returns nothing — so building to it would be building to a shape that was never built.
