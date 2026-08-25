@@ -148,9 +148,22 @@ func checkQuotes(body string) []finding.Diagnostic {
 // checkTrigger flags a description that states no trigger condition — it contains
 // none of the cue phrases that signal when to invoke the skill. Heuristic: it
 // catches the "a skill about X" anti-pattern without over-flagging.
+//
+// The trigger cues are the declarative forms — "trigger:", not "trigger". The bare word is
+// a domain term, and "a skill about database triggers" is precisely the anti-pattern this
+// exists to catch: matching it would trade a false positive for a false negative in a
+// blocking check, which is the worse direction, because a redline that lets bad skills
+// through is one nobody notices is broken.
+//
+// Measured over 286 real skills when this was fixed: 122 descriptions contain "trigger" at
+// all and only 72 use it declaratively. The other 50 happen to clear on "when" or "invoke",
+// so bare and declarative agree on that corpus — a property of the corpus, not of the rule.
 func checkTrigger(description string) []finding.Diagnostic {
 	low := strings.ToLower(description)
-	for _, cue := range []string{"when", "whenever", "invoke", "reach for", "before ", "after "} {
+	for _, cue := range []string{
+		"when", "whenever", "invoke", "reach for", "before ", "after ",
+		"trigger:", "triggers on", "trigger signal",
+	} {
 		if strings.Contains(low, cue) {
 			return nil
 		}
