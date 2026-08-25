@@ -479,7 +479,12 @@ not yet tracked elsewhere.
   severity (`canonizer verify.Specificity`). Those differ enough that a general `Applicability`
   mechanism now would be special-purpose code wearing a general name. Promote the one predicate that
   has repeated; leave the four gate styles alone until a shape repeats.
-- [ ] **DECIDED 2026-08-15: the exit condition IS met — name the two-member family.**
+- [x] **DECIDED 2026-08-15: the exit condition IS met — name the two-member family.**
+  **Closed 2026-08-24: this resolved to "name the rule, promote no type", and its one
+  action is already in the source.** The obligation it specifies —
+  *"a consumer that suppresses anything on this predicate must say so and say why"* — is on
+  `markdown.Doc.HasCodeBlock`, verbatim, along with the corollary that what gets suppressed
+  is the consumer's choice and the reason is not. Nothing is owed. Original entry:
   The shape to name is the one `HasCodeBlock` and `Convention` share: **derive a predicate
   from the artifact or its corpus, then suppress the deduction.** The other three answers
   (manual flag, defer-to-judge flag, advisory severity) are about *who decides* and stay
@@ -1149,7 +1154,17 @@ met before the knowledge-base tool exists at all.
 Source: a survey of `~/Documents/agent-fuschia` (26 repositories), driven by the gnosis
 work. Three items, each checked against the code here as well as there.
 
-- [ ] **`finding.Category` is an untyped string while `Severity` and `Action` are typed.**
+- [x] **`finding.Category` is an untyped string while `Severity` and `Action` are typed.**
+  **Resolved 2026-08-24 — by an entry that decided it in passing, under another heading.**
+  This entry ends *"the tension is real and this entry does not resolve it"*. The lineage
+  `Kind` entry does, while contrasting with its own field: *"Category stays an untyped
+  string because its drift is cosmetic — `softening` versus `skilllens-softening` named one
+  finding twice and nothing branched on it, so canonizer's output did not move when it
+  adopted the constant. A kind's drift is behavioural."*
+  So the answer is **stays untyped**, and the rule is the general one: where the kernel owns
+  the rules a value selects, the kernel owns the value's vocabulary — and nothing selects on
+  Category. Cross-referenced because a backlog where the resolution lives somewhere other
+  than the question is one that re-litigates. Original entry:
   `finding.go:46` is `Category string \`json:"category,omitempty"\``, so nothing prevents
   two tools — or two checks in one tool — from spelling the same failure differently, and
   `Sort` orders on a free-form field. `agent-fuschia/vac-protocol` §4 takes the other road:
@@ -1279,7 +1294,21 @@ flagged match… automated counts alone overstate both failure and success."*
   caller never has to think about this. Add the three-case table above as the
   regression test.
 
-- [ ] **A blanked code span leaves unreadable evidence text.** The sentence *If (code
+- [x] **A blanked code span leaves unreadable evidence text.** **Held 2026-08-24, and the
+  decision is already recorded where it belongs — on `skilllens.Span.Text`.** That doc
+  chooses between the two options this entry offers and gives the reason: **byte offsets,
+  not a copy of the substring**, because `Doc` holds no body, so carrying the substring
+  would mean the kernel storing a second copy of every source or taking one as a parameter,
+  and offsets let a caller widen the window to something readable where a fixed match
+  cannot.
+  Reproduced rather than restated: parsing *If (backtick-quoted go test command) fails,
+  stop* yields a `Text` of the word `If`, then a backtick, thirteen spaces, a backtick, and
+  the word `fail` — semantically the right match, and evidence made of whitespace.
+  **The trigger is a consumer reading `Span.Text` for display, and it is still unmet.**
+  Checked across the family: skillsaw calls `FailureMechanisms`, `SofteningPhrases` and
+  `BlacklistSections` in six places and reads only counts and `Units`, never `.Text`. So no
+  reader sees the whitespace, and shipping offsets now would be building for a consumer that
+  does not exist. Original entry: The sentence *If (code
   span) fails, stop.* yields a span whose `Text` is the word `If`, then a run of
   spaces where the code span was, then `fail` — the match is semantically right and
   the *evidence* is whitespace. Span length is preserved by
@@ -1656,7 +1685,11 @@ test-prompts hash, and the `claims` promotion. What each turned up beyond its en
   also a location that changed. A map keyed by a subset of `Changed` cannot, and the
   subset relation is asserted rather than commented.
 
-- [ ] **The release now carries four changes and two package removals.** `auditlog`
+- [x] **The release now carries four changes and two package removals.** **Cut, and this
+  entry is stale as of 2026-08-24.** `Delta.ChangedAxes` and `Skill.TestPromptsHash` are in
+  released `v0.21.0`, which skillsaw already pins and consumes — its `portable` command and
+  its prose/test-prompts coupling gate both read them. HEAD is three commits past that tag,
+  all backlog records. Original entry: `auditlog`
   moved to skillsaw and `provenance` is gone; no consumer imports either, verified by
   grep across the family. Additive: `skilllens` category constants, `Doc.CodeSpans`,
   `Skill.TestPromptsHash`, `Delta.ChangedAxes`, the `claims` package. Behavioural:
@@ -1725,12 +1758,82 @@ code applies to shared backlogs — one home, and a pointer from everywhere else
   `repo-govening` must not quietly buy lenient treatment. An alias table also manufactures
   synonyms, which the Category entry names as the failure that actually occurred, and it
   never shrinks. Vocabulary evolution belongs to a format version, which `ruleset` now has.
+  **DECIDED 2026-08-23: which rules each lineage keeps, measured rather than argued.** This
+  was the unwritten list the field had nothing to select without. Decomposing the redline
+  errors settles it, because they are not spread across the four rules — they are one rule
+  plus one input:
+
+  | redline rule                  | hand-written      | why                                                |
+  | ----------------------------- | ----------------- | -------------------------------------------------- |
+  | six RIA-TV++ segments         | **drop**          | methodology: how the skill was made, never claimed |
+  | quotation ceiling (150 words) | keep              | contract: constrains quotations, not provenance    |
+  | description states a trigger  | keep              | contract: about being loadable; also in `speclint` |
+  | `test-prompts.json` exists    | **not a redline** | completeness: an unauthored input, not a defect    |
+
+  `gh-cli`'s seven errors are **six missing segments plus one missing `test-prompts.json`**,
+  and `gh-cli`, `vale` and `unconventional-commits` trip the quotation ceiling and the
+  trigger rule **zero** times between them. So the two kept rules cost nothing to keep and
+  are not vacuous — they would fire if broken.
+  **The lineage field therefore selects one rule group, not a per-rule table.** That is a
+  much smaller thing to get right, and each rule now has a reason rather than a tag:
+  methodology travels with lineage, contract does not.
+  **`test-prompts.json` leaves the redline set rather than being dropped for hand-written
+  skills**, and the distinction matters: dropping it would convert *missing input* into *not
+  applicable*, which is exactly what skillsaw's **gate on the artifact, flag on the inputs**
+  rule forbids — a hand-written skill with no test prompts is not inapplicable, nobody has
+  written them. Its absence is already reported where it belongs: `skillsaw eval` flags
+  *"none of N behavioral case(s) specify checks; dim 8 cannot be scored"*. Blocking cannot
+  author the file; reporting can prompt someone to.
+  **Owed before the field ships:** decompose across all 48 no-RIA skills to confirm the
+  six-plus-one pattern holds and that no hand-written skill trips the quotation ceiling. If
+  one does, that rule's *keep* is confirmed by a violation rather than by zero.
+
+  **MEASURED 2026-08-24 over 286 skills — the debt is paid, and two of the three claims do
+  not survive it.** 102 carry no RIA-TV++ segments, not 48; the earlier figure was a subset.
+  Decomposed by rule and lineage:
+
+  | lineage                | rule                         | count |
+  | ---------------------- | ---------------------------- | ----- |
+  | hand-written (no RIA)  | six RIA-TV++ segments        | 601   |
+  | hand-written (no RIA)  | frontmatter: disallowed key  | 47    |
+  | hand-written (no RIA)  | frontmatter: angle brackets  | 6     |
+  | hand-written (no RIA)  | quotation ceiling            | **2** |
+  | book-derived (has RIA) | quotation ceiling            | 64    |
+  | book-derived (has RIA) | frontmatter: angle brackets  | 2     |
+  | book-derived (has RIA) | description states a trigger | 1     |
+
+  **The quotation ceiling's keep is confirmed by violation, exactly as this entry asked
+  for.** Two hand-written skills trip it. A rule that never fires cannot be shown to work,
+  so this is the better outcome of the two the entry allowed for.
+
+  **The six-plus-one pattern does not hold.** 601 segment errors over 102 skills is the six,
+  but `test-prompts.json` never appears — that rule does not fire through
+  `preflight --redlines` at all — and **53 frontmatter errors** appear that the three-skill
+  sample never showed. The pattern is six-plus-frontmatter, not six-plus-one.
+
+  **And the frontmatter errors are evidence for the axis this entry set aside.** 43 of the
+  47 disallowed keys are one key, `user-invocable`, carried by 43 hand-written skills that
+  load and run correctly — all 285 are `[Enabled]` in Gemini CLI. So the runtime accepts a
+  key `speclint` rejects. That is *"graded against contracts it never claimed"* on the
+  **audience** axis, at a scale the lineage evidence was chosen over. The entry's reasoning
+  for shipping lineage first — "where the seven-error case lives" — was measured before
+  these were counted; the seven-error case is real, and it is not the only one.
+
+  **One number here is stale by a day and re-measured.** The entry recorded the trigger rule
+  firing zero times. `redlines.checkTrigger` gained the declarative cues on 2026-08-24, and
+  it now fires once across the corpus — `matryer-decode-valid`, which states no condition at
+  all. The rule is still not vacuous and still cheap to keep; the figure simply predates the
+  fix.
   **Still not built, and the trigger is unchanged: a second checker that would branch on the
   field.** `Check.Applies`, cited below as the precedent, **does not exist in this module** —
   grep returns nothing — so building to it would be building to a shape that was never built.
-  And nobody has written which rules each kind keeps: `speclint`'s description cap plausibly
+  **That list now exists for lineage** — the table above — so the missing-list objection
+  applies to **audience only**, and the wording below said "each kind" when it meant that
+  narrower thing. Corrected 2026-08-23 because read as written it retracts the decision two
+  paragraphs above it. For audience it still holds: `speclint`'s description cap plausibly
   survives for a repo-governing skill, its trigger-condition rule plausibly does not, and
-  until that list exists the field is a kind nobody branches on.
+  until that list exists **audience** is a field nobody branches on. Which is the recorded
+  reason lineage ships first.
   `provenance` is the completed cautionary case rather than a live one — carried tested with
   zero importers until v0.20.0 deleted it.
   **exegesis is where this fires**, and its `--check redlines` mixed-tree entry is still open
@@ -1749,3 +1852,113 @@ code applies to shared backlogs — one home, and a pointer from everywhere else
   which is a smaller change than the two rubrics it avoids — and it is the same
   shape as `Check.Applies`: state which convention applies rather than applying all of
   them.
+
+## One Field Declined, from Exegesis's Act-Statement Work (2026-08-23)
+
+- [ ] **`manifest.Manifest` has no field saying which act produced the verdict, and it
+  should not get one until a second tool can set it.** exegesis landed the human half of
+  `vac-protocol` §4 — every `verify` run now ends with *"structural gates only; semantic
+  replay not performed"* — and stopped short of the manifest field its own entry proposed,
+  `semantic_verification: "not-performed"`.
+
+  **The reason is not the release boundary, it is the value.** For exegesis the field is a
+  **constant**: exegesis is the structural half by charter and never performs semantic
+  replay, so the field can only ever hold one string. That is this file's own recorded
+  cautionary case — `provenance`, *"carried tested with zero importers until v0.20.0 deleted
+  it"* — and adding a one-valued field to a kernel type is how that happens again.
+
+  **The trigger is a tool that would set it to *performed*.** A semantic replayer or grader
+  in the family makes the field carry information; until then `StructureVerified` already
+  names its own axis, and what was missing was that nothing *said* "structure" excludes
+  quality — which a sentence fixes and a constant does not.
+
+  Note the asymmetry worth keeping: a **machine** reader still cannot learn this from the
+  manifest, only a human from the run output. That is a real gap and the honest price of not
+  encoding a constant. It becomes worth paying the moment the value can vary.
+
+## `redlines.checkTrigger` Does Not Recognise the Word "Trigger" (2026-08-24)
+
+Found from skillsaw, running `preflight --redlines` over 286 installed skills to pick a
+subject for an activation experiment.
+
+`checkTrigger` clears a description that contains any of six cues:
+
+```go
+for _, cue := range []string{"when", "whenever", "invoke", "reach for", "before ", "after "} {
+```
+
+**The list omits "trigger".** So a description opening `Trigger: user is using
+context.WithValue or asking about context keys` — the most explicit statement of a trigger
+condition available — is flagged as stating none. Confirmed directly against
+`redlines.Check`: that string yields the "description should state a trigger condition"
+diagnostic.
+
+- [x] **Add the word the check is named for.** Done 2026-08-24 — but **not the bare word**,
+  which was the obvious fix and the wrong one. "trigger" is a domain term, and *"a skill
+  about database triggers"* is precisely the anti-pattern this check exists to catch: adding
+  it would have traded a false positive for a false negative in a **blocking** check, which
+  is the worse direction, since a redline that lets bad skills through is one nobody notices
+  is broken.
+  The cues added are the declarative forms — `trigger:`, `triggers on`, `trigger signal` —
+  each observed in a real 286-skill corpus. Measured there: 122 descriptions contain
+  "trigger" at all and only 72 use it declaratively; the other 50 happen to clear on `when`
+  or `invoke`, so bare and declarative agree *on that corpus* — a property of the corpus,
+  not of the rule, and the hazard case is one skill away.
+  The test gained the case that matters most for a blocking check: `A skill about database
+  triggers.` **must still be flagged**. Verified by shortening the cue to the bare word,
+  which fails exactly that case.
+  **Confirmed in the field, not just in a unit test.** Rebuilding skillsaw against this
+  and re-running `preflight --redlines` over the same 286 skills takes the trigger redline
+  from **5 flags to 1** — the survivor being `matryer-decode-valid`, whose description
+  states no condition at all (*"Eliminate repetitive decode-then-validate boilerplate…"*)
+  and which independently failed two phrasings of skillsaw's adversarial corpus. Its staying
+  flagged is what makes the fix trustworthy rather than merely quieter.
+  One correction worth recording: four of the five were false positives, not three. I had
+  read `webapp-review` as borderline from its opening — *"Use to review a … pull request"* —
+  and reading the whole description shows an explicit `Trigger signals:` list further in.
+  Deliberately **not** widened to `use to`, `apply when` or similar: nothing in 286 skills
+  needs them, and each unmotivated cue weakens a blocking check. Original entry: `trigger` (which also covers `triggers on:`
+      and `trigger signal:`) and plausibly `use this skill`, `use for`, `apply when`.
+      Two of skillsaw's operator's 286 skills are affected —
+      `context-key-collision-prevention` and `option-configuration-patterns` — both of which
+      state a trigger in the clearest form and are told they do not.
+      **This is a redline, so it is `SeverityError` and blocking.** A false positive here
+      does not merely misreport: it rejects a well-written skill from a gate that exists to
+      reject badly-written ones, which is the direction that costs trust fastest.
+      The existing comment says the heuristic *"catches the 'a skill about X' anti-pattern
+      without over-flagging"*. Over-flagging is exactly what it does, and the fix is one
+      entry in a list — but the cue list is the kind of thing that wants a case both ways,
+      given it is blocking: a description stating a trigger that must pass, and an "a skill
+      about X" description that must still fail.
+
+## Mechanical Forms of Good Advice — Four Measured Instances (2026-08-24)
+
+Not a work item. A shape that has now been measured **four times in three repositories**,
+recorded once here because the next instance will be proposed in a fourth.
+
+Each began as advice that is *correct*, and failed as a check because the mechanical proxy
+selected on a **correlate** that the good case also exhibits — usually more strongly than the
+bad case does.
+
+| advice                                             | mechanical form                          | what it actually flagged                                                                                                                    |
+| -------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| "encode failure modes"                             | skilllens dim 9, counter-examples        | with `blacklist_empty_base = 2`, dim 9 is weakest, so `diagnose` recommends the form superpowers measured as worse than no guidance         |
+| "a description states a trigger, not a process"    | description contains an own-body heading | `zero-touch-production`, for "Do Not Use This Skill When" — a negative trigger condition the guidance asks for                              |
+| "a book skill has six RIA-TV++ segments"           | require all six of every skill           | `gh-cli`, `vale`, `unconventional-commits` — hand-written skills, 7 errors each about a format they never claimed                           |
+| "every instruction is backed by a working command" | resolve named commands                   | `mycmd install`, `myapp serve`, `deploy --reset` — deliberate placeholders in the CLI-design skills, which *should* name fictional commands |
+
+**The common mechanism:** the proxy measures a surface feature (vocabulary overlap, section
+presence, name resolution, heading count) that correlates with the defect in the bad case and
+correlates *at least as strongly* with correctness in the good case. Tightening a threshold
+does not separate them, because the two populations are not separated on that axis at all.
+
+**The test that catches it, and it is cheap:** before building a mechanical form of any
+advice, run the predicate over the corpus and **read what it flags, not how many**. All four
+were caught this way, and three were caught before any code was written. A count cannot
+distinguish "13 defects" from "13 correct skills"; only the identity of the flagged cases can.
+This is the same discipline as `holds.toml`'s `kind = "manual"` — when a condition will not
+reduce to a string, saying so is the honest declaration.
+
+**Corollary for reviewers:** "it is a string comparison, not a heuristic" is not evidence of
+safety. Two of the four were exact and deterministic. Exactness governs whether a check is
+*reproducible*, not whether it is *measuring the right thing*.

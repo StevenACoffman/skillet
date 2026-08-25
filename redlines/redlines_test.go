@@ -47,6 +47,29 @@ func TestCheck(t *testing.T) {
 			body: allSegments, description: "A skill about testing strategy.",
 			wantCount: 1, wantContains: "should state a trigger condition",
 		},
+		// The hazard case, and the reason the cues are the declarative forms rather than
+		// the bare word. "trigger" is a domain term; this description is the very
+		// anti-pattern the check exists to catch and it contains it. Shortening the cue to
+		// "trigger" would silently turn a blocking check into one that passes this.
+		"the anti-pattern is still flagged when it happens to say trigger": {
+			body: allSegments, description: "A skill about database triggers.",
+			wantCount: 1, wantContains: "should state a trigger condition",
+		},
+		// The three declarative forms found in a real 286-skill corpus. Each of these was
+		// flagged before the cue list learned them, so each is a blocking false positive
+		// on a description that states its trigger in the clearest way available.
+		"a description opening Trigger: passes": {
+			body:        allSegments,
+			description: "Trigger: user is using context.WithValue or asking about context keys.",
+		},
+		"a description with Triggers on: passes": {
+			body:        allSegments,
+			description: `Write property-based tests using rapid. Triggers on: "PBT", "rapid tests".`,
+		},
+		"a description with Trigger signals: passes": {
+			body:        allSegments,
+			description: `Review a pull request end to end. Trigger signals: - "review PR <n>"`,
+		},
 		"an over-long quotation is flagged": {
 			body:        allSegments + "\n> " + strings.Repeat("word ", redlines.MaxQuoteWords+1),
 			description: triggerDesc,

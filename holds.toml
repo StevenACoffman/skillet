@@ -98,3 +98,23 @@ id        = "adjudication-artifact"
 kind      = "manual"
 condition = "blocked on the ruleset format version, not on consumer count; three repos already specify it"
 where     = "TODO.md — Adjudication is a distinct artifact from detection"
+
+[[hold]]
+id        = "warrant-cited-unbuilt"
+kind      = "count"
+condition = "gnosis_warrant is built; this repository and canonizer cite the section that specifies it"
+where     = "gnosis SPEC.md §10.6.4 — load-bearing outside gnosis before any of it is built"
+# Inverted on purpose: met means the citation risk is over, not that work is due.
+#
+# §10.6.4 records that a grep for gnosis_warrant returns nothing while two repositories
+# point at the section as the family's model of adjudication authority. The risk it names
+# is that a reshaping done for local convenience breaks something not in that repository
+# to notice -- and an unbuilt cited section looks identical to a built one from outside.
+#
+# Threshold 1, not 2: this is not a promotion trigger. It asks whether the thing exists.
+  [hold.count]
+  pattern   = "gnosis_warrant"
+  include   = "*.go"
+  exclude   = "*_test.go"
+  threshold = 1
+  compare   = "at-least"
