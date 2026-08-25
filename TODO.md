@@ -479,7 +479,12 @@ not yet tracked elsewhere.
   severity (`canonizer verify.Specificity`). Those differ enough that a general `Applicability`
   mechanism now would be special-purpose code wearing a general name. Promote the one predicate that
   has repeated; leave the four gate styles alone until a shape repeats.
-- [ ] **DECIDED 2026-08-15: the exit condition IS met — name the two-member family.**
+- [x] **DECIDED 2026-08-15: the exit condition IS met — name the two-member family.**
+  **Closed 2026-08-24: this resolved to "name the rule, promote no type", and its one
+  action is already in the source.** The obligation it specifies —
+  *"a consumer that suppresses anything on this predicate must say so and say why"* — is on
+  `markdown.Doc.HasCodeBlock`, verbatim, along with the corollary that what gets suppressed
+  is the consumer's choice and the reason is not. Nothing is owed. Original entry:
   The shape to name is the one `HasCodeBlock` and `Convention` share: **derive a predicate
   from the artifact or its corpus, then suppress the deduction.** The other three answers
   (manual flag, defer-to-judge flag, advisory severity) are about *who decides* and stay
@@ -1149,7 +1154,17 @@ met before the knowledge-base tool exists at all.
 Source: a survey of `~/Documents/agent-fuschia` (26 repositories), driven by the gnosis
 work. Three items, each checked against the code here as well as there.
 
-- [ ] **`finding.Category` is an untyped string while `Severity` and `Action` are typed.**
+- [x] **`finding.Category` is an untyped string while `Severity` and `Action` are typed.**
+  **Resolved 2026-08-24 — by an entry that decided it in passing, under another heading.**
+  This entry ends *"the tension is real and this entry does not resolve it"*. The lineage
+  `Kind` entry does, while contrasting with its own field: *"Category stays an untyped
+  string because its drift is cosmetic — `softening` versus `skilllens-softening` named one
+  finding twice and nothing branched on it, so canonizer's output did not move when it
+  adopted the constant. A kind's drift is behavioural."*
+  So the answer is **stays untyped**, and the rule is the general one: where the kernel owns
+  the rules a value selects, the kernel owns the value's vocabulary — and nothing selects on
+  Category. Cross-referenced because a backlog where the resolution lives somewhere other
+  than the question is one that re-litigates. Original entry:
   `finding.go:46` is `Category string \`json:"category,omitempty"\``, so nothing prevents
   two tools — or two checks in one tool — from spelling the same failure differently, and
   `Sort` orders on a free-form field. `agent-fuschia/vac-protocol` §4 takes the other road:
@@ -1279,7 +1294,21 @@ flagged match… automated counts alone overstate both failure and success."*
   caller never has to think about this. Add the three-case table above as the
   regression test.
 
-- [ ] **A blanked code span leaves unreadable evidence text.** The sentence *If (code
+- [x] **A blanked code span leaves unreadable evidence text.** **Held 2026-08-24, and the
+  decision is already recorded where it belongs — on `skilllens.Span.Text`.** That doc
+  chooses between the two options this entry offers and gives the reason: **byte offsets,
+  not a copy of the substring**, because `Doc` holds no body, so carrying the substring
+  would mean the kernel storing a second copy of every source or taking one as a parameter,
+  and offsets let a caller widen the window to something readable where a fixed match
+  cannot.
+  Reproduced rather than restated: parsing *If (backtick-quoted go test command) fails,
+  stop* yields a `Text` of the word `If`, then a backtick, thirteen spaces, a backtick, and
+  the word `fail` — semantically the right match, and evidence made of whitespace.
+  **The trigger is a consumer reading `Span.Text` for display, and it is still unmet.**
+  Checked across the family: skillsaw calls `FailureMechanisms`, `SofteningPhrases` and
+  `BlacklistSections` in six places and reads only counts and `Units`, never `.Text`. So no
+  reader sees the whitespace, and shipping offsets now would be building for a consumer that
+  does not exist. Original entry: The sentence *If (code
   span) fails, stop.* yields a span whose `Text` is the word `If`, then a run of
   spaces where the code span was, then `fail` — the match is semantically right and
   the *evidence* is whitespace. Span length is preserved by
@@ -1656,7 +1685,11 @@ test-prompts hash, and the `claims` promotion. What each turned up beyond its en
   also a location that changed. A map keyed by a subset of `Changed` cannot, and the
   subset relation is asserted rather than commented.
 
-- [ ] **The release now carries four changes and two package removals.** `auditlog`
+- [x] **The release now carries four changes and two package removals.** **Cut, and this
+  entry is stale as of 2026-08-24.** `Delta.ChangedAxes` and `Skill.TestPromptsHash` are in
+  released `v0.21.0`, which skillsaw already pins and consumes — its `portable` command and
+  its prose/test-prompts coupling gate both read them. HEAD is three commits past that tag,
+  all backlog records. Original entry: `auditlog`
   moved to skillsaw and `provenance` is gone; no consumer imports either, verified by
   grep across the family. Additive: `skilllens` category constants, `Doc.CodeSpans`,
   `Skill.TestPromptsHash`, `Delta.ChangedAxes`, the `claims` package. Behavioural:
