@@ -1,6 +1,7 @@
 package related_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/StevenACoffman/skillet/related"
@@ -110,5 +111,87 @@ func TestInlineSlugNeedsTheTargetInTree(t *testing.T) {
 		if r.Title == "Other Title (`elsewhere`)" && r.Resolution != related.TitleUnknown {
 			t.Errorf("a cross-tree inline slug resolved to %q; it has no answer here", r.Slug)
 		}
+	}
+}
+
+// wantResolveTitles rewrites one body and asserts the result and the count together: a
+// count without the text would pass on a rewrite that changed the wrong thing.
+func wantResolveTitles(t *testing.T, body, want string, wantN int) {
+	t.Helper()
+	nodes := tree()
+	known := map[string]bool{}
+	for i := range nodes {
+		known[nodes[i].Slug] = true
+	}
+	got, n := related.ResolveTitles(body, related.NewTitles(nodes), known)
+	if n != wantN {
+		t.Errorf("changed = %d, want %d", n, wantN)
+	}
+	if got != want {
+		t.Errorf("body =\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestResolveTitlesRewritesOnlyWhatItIsSureOf(t *testing.T) {
+	t.Parallel()
+	head := "## Related Skills\n\n"
+	tests := []struct {
+		name       string
+		body, want string
+		n          int
+	}{{
+		name: "an exact title becomes its slug, the rest of the bullet untouched",
+		body: head + "- **Alpha Skill** — *depends-on* → why\n",
+		want: head + "- **alpha** — *depends-on* → why\n", n: 1,
+	}, {
+		// Both are refusals for the same reason: a wrong rewrite becomes an edge
+		// nobody can distinguish from an authored one.
+		name: "an ambiguous title is left byte-identical",
+		body: head + "- **Shared Heading** — *depends-on* → why\n",
+		want: head + "- **Shared Heading** — *depends-on* → why\n", n: 0,
+	}, {
+		name: "an unknown title is left byte-identical",
+		body: head + "- **Nothing Like This** — *depends-on* → why\n",
+		want: head + "- **Nothing Like This** — *depends-on* → why\n", n: 0,
+	}, {
+		name: "a bullet already naming a slug is not touched",
+		body: head + "- **alpha** — *depends-on* → why\n",
+		want: head + "- **alpha** — *depends-on* → why\n", n: 0,
+	}, {
+		name: "a kind in the bold position is not a title",
+		body: head + "- **composes_with**: alpha — why\n",
+		want: head + "- **composes_with**: alpha — why\n", n: 0,
+	}, {
+		// Prose outside the section must never be rewritten, however it reads.
+		name: "text outside a related section is untouched",
+		body: "# Doc\n\n- **Alpha Skill** — a sentence about it\n",
+		want: "# Doc\n\n- **Alpha Skill** — a sentence about it\n", n: 0,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			wantResolveTitles(t, tt.body, tt.want, tt.n)
+		})
+	}
+}
+
+// TestResolveTitlesThenNormalizeYieldsACanonicalBullet is the pair that matters: the
+// substitution is only useful because the reader can then understand the bullet, which
+// it could not before the dialect tolerances landed.
+func TestResolveTitlesThenNormalizeYieldsACanonicalBullet(t *testing.T) {
+	t.Parallel()
+	nodes := tree()
+	known := map[string]bool{}
+	for i := range nodes {
+		known[nodes[i].Slug] = true
+	}
+	body := "## Related Skills\n\n- **Alpha Skill** — *depends-on* → because.\n"
+	resolved, n := related.ResolveTitles(body, related.NewTitles(nodes), known)
+	if n != 1 {
+		t.Fatalf("changed = %d, want 1", n)
+	}
+	out, _ := related.Normalize(resolved)
+	if !strings.Contains(out, "- depends-on: `alpha` — because.") {
+		t.Errorf("normalized =\n%s\nwant a canonical depends-on bullet", out)
 	}
 }

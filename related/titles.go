@@ -192,3 +192,71 @@ func inlineSlug(title string) (string, bool) {
 	tok := strings.TrimSpace(parts[1])
 	return tok, tok != ""
 }
+
+// ResolveTitles rewrites bullets that name a skill by display title so they name it by
+// slug, reporting how many it changed.
+//
+// **Substitution, not parsing.** It replaces the bold token and leaves the rest of the
+// bullet exactly as written, so the existing reader handles it on the next pass and there
+// is one definition of what a bullet means. Threading a title index through dialects.go
+// would put corpus knowledge inside the parser, where a wrong lookup would become an edge
+// with no trace of the substitution that made it.
+//
+// **Only exact, unambiguous matches move.** An unknown title and an ambiguous one are
+// both left byte-identical, which is the same asymmetry the lookup is built on: an
+// unresolved bullet stays visibly broken until someone fixes it, and a bullet rewritten
+// to the wrong slug becomes an edge indistinguishable from one the author wrote.
+//
+// Pure: the caller supplies the index and writes the result.
+func ResolveTitles(body string, titles Titles, known map[string]bool) (string, int) {
+	lines := strings.Split(body, "\n")
+	changed := 0
+	for _, sec := range findSections(lines) {
+		for _, b := range sectionBullets(lines, sec.head, sec.end) {
+			slug, ok := resolvedTitleFor(b.text, titles, known)
+			if !ok {
+				continue
+			}
+			// Only the first line of a folded bullet can hold the leading bold token,
+			// so the continuation lines are untouched by construction.
+			lines[b.start] = replaceBoldToken(lines[b.start], slug)
+			changed++
+		}
+	}
+	if changed == 0 {
+		return body, 0
+	}
+	return strings.Join(lines, "\n"), changed
+}
+
+// resolvedTitleFor reports the slug a bullet's leading bold token resolves to, when that
+// token is a display title that resolves exactly and unambiguously.
+func resolvedTitleFor(text string, titles Titles, known map[string]bool) (string, bool) {
+	rest, ok := strings.CutPrefix(strings.TrimSpace(text), "- **")
+	if !ok {
+		return "", false
+	}
+	end := strings.Index(rest, "**")
+	if end <= 0 {
+		return "", false
+	}
+	tok := rest[:end]
+	if known[tok] || strings.Contains(tok, "_") {
+		return "", false // already a slug, or a kind in the bold position
+	}
+	slug, res := resolveToken(titles, known, tok)
+	return slug, res == TitleResolved
+}
+
+// replaceBoldToken swaps the contents of a line's first bold span.
+func replaceBoldToken(line, slug string) string {
+	open := strings.Index(line, "**")
+	if open < 0 {
+		return line
+	}
+	shut := strings.Index(line[open+2:], "**")
+	if shut < 0 {
+		return line
+	}
+	return line[:open+2] + slug + line[open+2+shut:]
+}
