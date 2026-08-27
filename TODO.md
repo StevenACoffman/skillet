@@ -1724,8 +1724,38 @@ code applies to shared backlogs — one home, and a pointer from everywhere else
   and must not acquire. gnosis reached the same conclusion from the other side when it
   declined to import this package for claim predicates: what the two share is a shape,
   and a shape is followed rather than imported.
-- [ ] **A skill is graded against contracts it never claimed, and the entry below names the
-  wrong axis for it.** REVISED 2026-08-23 after measuring; the original framing follows.
+- [x] **A skill is graded against contracts it never claimed, and the entry below names the
+  wrong axis for it.** *Lineage half DONE 2026-08-27; audience half still open below.*
+
+  `skill.Lineage` is closed and typed with `LineageUnset` as the zero value, read from
+  **`metadata.lineage`**, and `redlines.Check` asks for the RIA segments only where the
+  skill claims that format. Every decision this entry argued for held: single-valued not a
+  set, closed not a bare string, no aliases, unrecognised graded strictly *and* reported.
+
+  Two things the build taught that the entry could not:
+
+  - **The key had to nest under `metadata`.** Declaring it top-level traded six
+    diagnostics for a `disallowed key "lineage"` error, because speclint's allowlist is
+    the published agentskills.io set — and its own doc says anything outside the spec
+    belongs under `metadata`. `tags` is worth being *the* deviation only while it is the
+    only one. Found by running it, not by reading.
+  - **Unrecognised is derived, not stored.** A `LineageOK bool` reads "unrecognised" at
+    its zero value, which is exactly what the `FrontmatterErr` path produces — nothing
+    parsed, nothing to report. Keeping the raw value and deriving the answer makes the
+    zero value correct.
+
+  **It silences nothing on the current corpus** — 428 RIA diagnostics across 298 skills,
+  unchanged — and that is the design: absence is graded strictly, so the exemption is not
+  reachable by omission. What changed is that a hand-written skill can now be exempted at
+  all, by one line, instead of the caller carrying correctness by knowing which tree it is
+  in.
+
+  Not merged with skillsaw/adh's executes-anything predicate, and the reason is recorded on
+  the type: that one must be *derived* because nobody declares whether an artifact runs
+  commands; this one must not be, because the document is the only witness to its own
+  origin. Same shape, opposite epistemics.
+
+  Original entry: REVISED 2026-08-23 after measuring; the original framing follows.
   **There are two orthogonal axes, not one binary, and the one this entry proposed is the
   smaller half.** Measured with `lint --check redlines` over the corpus:
 
