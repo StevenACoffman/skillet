@@ -43,7 +43,29 @@ var reFence = regexp.MustCompile("(?s)```.*?```|~~~.*?~~~")
 func Check(s *skill.Skill) []finding.Diagnostic {
 	body := reFence.ReplaceAllString(s.Body, "")
 	var ds []finding.Diagnostic
-	ds = append(ds, checkSegments(body)...)
+	// The RIA-TV++ segments are asked of a skill that claims that format, which the
+	// skill declares (skill.Lineage) rather than the checker inferring. Measured over a
+	// 233-skill corpus, an unguarded contract reported **six diagnostics each for 48
+	// hand-written skills** -- `gh-cli`, `vale`, `unconventional-commits` and the rest --
+	// about a format those documents never used. That is not drift from the contract; it
+	// is a document that was never produced against it.
+	//
+	// Inferring from the body was considered and refused: a hand-written skill with no
+	// segments and a malformed book skill that lost its segments look identical, and want
+	// opposite treatment. See skill.Lineage for why this must be declared where
+	// skillsaw's executes-anything predicate must be derived.
+	if s.Lineage.ClaimsRIASegments() {
+		ds = append(ds, checkSegments(body)...)
+	}
+	// A value outside the vocabulary is reported, and was already graded strictly above
+	// because ParseLineage leaves Lineage unset for it. Both halves matter: a typo must
+	// not buy lenience, and it must not fail closed in silence either.
+	if raw, bad := s.UnrecognisedLineage(); bad {
+		ds = append(ds, diagf(
+			"redline: unknown %s %q (want %q or %q); graded as if it claimed the "+
+				"RIA-TV++ format", skill.LineagePath, raw, skill.BookDerived,
+			skill.HandWritten))
+	}
 	ds = append(ds, checkQuotes(body)...)
 	// Only ask for a trigger when there was a description to read; see the note on
 	// skill.Skill.FrontmatterErr. An unparsed block leaves Description empty, and

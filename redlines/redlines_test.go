@@ -265,3 +265,108 @@ func TestQuotesAgreesWithTheRedLineItBacks(t *testing.T) {
 		t.Errorf("Quotes says %d runs are over the limit, Check reports %d", over, ds)
 	}
 }
+
+// wantSegmentDiagnostics counts the RIA-segment and unknown-lineage diagnostics a skill
+// collects. The helper exists so each case below reads as a claim about a lineage rather
+// than as diagnostic filtering.
+func wantSegmentDiagnostics(t *testing.T, lineage, body string, wantSeg, wantUnknown int) {
+	t.Helper()
+	raw, _ := skill.ParseLineage(lineage)
+	s := &skill.Skill{
+		Description: "Use when the reader needs a worked example.",
+		Body:        body,
+		Lineage:     raw,
+		LineageRaw:  lineage,
+	}
+	var seg, unknown int
+	for _, d := range redlines.Check(s) {
+		switch {
+		case strings.Contains(d.Message, "RIA segment"):
+			seg++
+		case strings.Contains(d.Message, "unknown "+skill.LineagePath):
+			unknown++
+		}
+	}
+	if seg != wantSeg {
+		t.Errorf("lineage %q: %d segment diagnostics, want %d", lineage, seg, wantSeg)
+	}
+	if unknown != wantUnknown {
+		t.Errorf("lineage %q: %d unknown-lineage diagnostics, want %d",
+			lineage, unknown, wantUnknown)
+	}
+}
+
+// TestSegmentContractKeysOnDeclaredLineage. Measured over a 233-skill corpus, the
+// unguarded contract reported six diagnostics each for 48 hand-written skills about a
+// format they never claimed. The exemption is declared, never inferred: a hand-written
+// skill with no segments and a malformed book skill that shed its segments look identical
+// from the body and want opposite treatment.
+func TestSegmentContractKeysOnDeclaredLineage(t *testing.T) {
+	t.Parallel()
+	const prose = "# A Tool Skill\n\nRun the thing, then read the output.\n"
+	tests := []struct {
+		name        string
+		lineage     string
+		wantSeg     int
+		wantUnknown int
+	}{{
+		name:    "a declared hand-written skill is not graded on segments",
+		lineage: "hand-written", wantSeg: 0, wantUnknown: 0,
+	}, {
+		name:    "a declared book-derived skill is graded on all six",
+		lineage: "book-derived", wantSeg: 6, wantUnknown: 0,
+	}, {
+		// The zero value must not assert. Treating absence as hand-written would hand
+		// every skill an escape by omission, which is the same hole as a book skill
+		// shedding headings until it looks like something else.
+		name:    "an undeclared skill is still graded on all six",
+		lineage: "", wantSeg: 6, wantUnknown: 0,
+	}, {
+		// Strictest treatment *and* a report. A near-miss must not buy lenience, and it
+		// must not fail closed in silence either.
+		//
+		// The value is a missing hyphen rather than a misspelling on purpose: the
+		// misspell linter autofixes a literal typo in a string, which silently turned an
+		// earlier version of this case into a copy of the passing one above.
+		name:    "a near-miss value is graded strictly and reported",
+		lineage: "handwritten", wantSeg: 6, wantUnknown: 1,
+	}, {
+		name:    "an unrecognised newer vocabulary is handled the same way",
+		lineage: "machine-distilled", wantSeg: 6, wantUnknown: 1,
+	}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			wantSegmentDiagnostics(t, tt.lineage, prose, tt.wantSeg, tt.wantUnknown)
+		})
+	}
+}
+
+// TestLineageDoesNotExemptTheOtherRedLines. Only the segment contract is lineage-scoped:
+// an over-long quotation is a defect whichever way the document was produced, and every
+// skill has a description to state a trigger in.
+func TestLineageDoesNotExemptTheOtherRedLines(t *testing.T) {
+	t.Parallel()
+	long := "> " + strings.Repeat("word ", 200) + "\n"
+	s := &skill.Skill{
+		Description: "a summary with no trigger",
+		Body:        "# T\n\n" + long,
+		Lineage:     skill.HandWritten,
+		LineageRaw:  "hand-written",
+	}
+	var quote, trigger int
+	for _, d := range redlines.Check(s) {
+		if strings.Contains(d.Message, "quotation") {
+			quote++
+		}
+		if strings.Contains(d.Message, "trigger") {
+			trigger++
+		}
+	}
+	if quote == 0 {
+		t.Error("a hand-written skill's over-long quotation went unreported")
+	}
+	if trigger == 0 {
+		t.Error("a hand-written skill's description was not asked for a trigger")
+	}
+}
