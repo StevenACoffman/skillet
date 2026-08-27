@@ -34,8 +34,23 @@ type Skill struct {
 	FrontmatterKeys []string // top-level frontmatter keys, sorted (for lint)
 	Frontmatter     string   // raw YAML frontmatter block (between the --- lines)
 	Body            string   // markdown body after the frontmatter
-	Raw             string   // full file contents
-	Bytes           int      // byte size of Raw
+
+	// Lineage is the recognised `lineage:` declaration, LineageUnset when absent *or*
+	// unrecognised, so a caller that ignores LineageRaw gets the strictest treatment.
+	//
+	// LineageRaw is the value as written, kept so an unrecognised one can be reported
+	// verbatim rather than described. Unrecognised is therefore
+	// `LineageRaw != "" && Lineage == LineageUnset` — derived rather than a second
+	// boolean, because a bool's zero value would say "unrecognised" on the
+	// FrontmatterErr path, where nothing was parsed and there is nothing to report.
+	// That is the trap the note on FrontmatterErr describes, one field over.
+	//
+	// A bad value is not a load failure, for the same reason FrontmatterErr is not: one
+	// malformed skill must not stop a caller walking a tree.
+	Lineage    Lineage
+	LineageRaw string
+	Raw        string // full file contents
+	Bytes      int    // byte size of Raw
 
 	// FrontmatterErr is the error from parsing the YAML frontmatter, or nil when it
 	// parsed. When it is non-nil, Name, Description and FrontmatterKeys are zero
@@ -167,6 +182,22 @@ func (s *Skill) parse() {
 	s.FrontmatterKeys = keys
 	s.Name = strings.TrimSpace(asString(fields["name"]))
 	s.Description = strings.TrimSpace(asString(fields["description"]))
+	s.LineageRaw = strings.TrimSpace(asString(nested(fields, MetadataKey, LineageKey)))
+	s.Lineage, _ = ParseLineage(s.LineageRaw)
+}
+
+// nested reads fields[outer][inner], tolerating either map key type go-yaml may produce
+// and any shape that is not a map at all. A declaration in the wrong shape reads as
+// absent, which is graded strictly rather than leniently.
+func nested(fields map[string]any, outer, inner string) any {
+	switch m := fields[outer].(type) {
+	case map[string]any:
+		return m[inner]
+	case map[any]any:
+		return m[inner]
+	default:
+		return nil
+	}
 }
 
 func asString(v any) string {
