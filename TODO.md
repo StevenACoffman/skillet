@@ -2021,3 +2021,26 @@ orphaned. A package under `internal/` cannot be reached from a sibling repo.
   package is right because exegesis's ten callers already use the rest, but a new entry
   point invented for skillsaw's convenience would be a shared package designed for one
   caller's shape.
+
+- [ ] **`related` reads under half the edges a real corpus declares.** Measured
+  2026-08-27 over `steve-skill-market` (233 skills): the parser resolves **222 edges from
+  520 related-skill bullets**, after `exegesis normalize` had already converted 117 skills.
+  The remainder sit in dialects `dialects.go` does not accept:
+
+  | form | example | mechanical? |
+  | ---- | ------- | ----------- |
+  | underscore kinds | `- **composes_with**: slug — …` | yes |
+  | italic kind marker | `- **slug** — *combines*: …` | yes |
+  | arrow separator | `- **Name** — *depends-on* → …` | yes |
+  | bold **display name** | `- **Architect Elevator** — …` | **no** |
+
+  The first three are the same tolerance `dialects.go` already provides for other forms
+  and belong here. **The fourth cannot be resolved by a parser**: `Architect Elevator` is
+  not a slug, and nothing in the document maps it to one — that needs a corpus-wide
+  name→slug lookup, filed in exegesis where the tree is walked.
+
+  **This is the H3-heading defect at fifteen times the scale.** An unreadable edge is
+  indistinguishable from an absent one, so every consumer — `index`, `verify`'s graph
+  check, and the orphan gate now filed in skillsaw — sees a graph missing more than half
+  its edges and cannot tell. Fix before the orphan gate ships: an orphan count over 222 of
+  520 declared relationships would be confidently wrong.
