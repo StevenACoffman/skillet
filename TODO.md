@@ -1992,3 +1992,32 @@ reduce to a string, saying so is the honest declaration.
 **Corollary for reviewers:** "it is a string comparison, not a heuristic" is not evidence of
 safety. Two of the four were exact and deterministic. Exactness governs whether a check is
 *reproducible*, not whether it is *measuring the right thing*.
+
+## Promote `related` From exegesis (2026-08-27)
+
+Source: siting the orphan gate. exegesis's `internal/related` is the only reader of the
+`## Related skills` edge graph, and `skillsaw changed` needs it to compute what a change
+orphaned. A package under `internal/` cannot be reached from a sibling repo.
+
+- [ ] **Promote `related` — the `## Related skills` edge reader — to skillet.**
+  **Promote-on-second-consumer, and this is the second consumer.** exegesis has ten
+  callers (`link`, `index`, `relate`, `normalize`, `verify`, `indexgen`, `mergemigrate`,
+  `distill`, `scaffold`, plus its own internal one); skillsaw needs `ParseSection` and the
+  `Edge`/`Kind` vocabulary to compute newly-orphaned nodes against a baseline manifest.
+
+  **It is already shaped for promotion**: stdlib-only (`fmt`, `sort`, `strings`), pure over
+  a markdown string, no filesystem. Same profile as `claims`, which carries a
+  `TestImportsNothing` for exactly this reason — a body parser that grows a dependency
+  starts constraining its consumers.
+
+  What moves: `related.go` (Kind, Edge, ParseSection, Bullet, Upsert, Qualified),
+  `dialects.go` (the bullet-dialect tolerance), `graph.go` (Node, LearningPath, Mermaid,
+  DanglingEdges, UnknownSlugs), `index.go`, `normalize.go`, and the testdata. exegesis then
+  imports it and deletes its copy — **not a fork**; a second implementation of "what is an
+  edge" would disagree at the margins over fences and wrapped bullets, which is the
+  argument that put `redlines.Quotes` here.
+
+  **Do not widen the API on the way across.** skillsaw needs a subset; promoting the whole
+  package is right because exegesis's ten callers already use the rest, but a new entry
+  point invented for skillsaw's convenience would be a shared package designed for one
+  caller's shape.
