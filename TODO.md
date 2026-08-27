@@ -1999,7 +1999,9 @@ Source: siting the orphan gate. exegesis's `internal/related` is the only reader
 `## Related skills` edge graph, and `skillsaw changed` needs it to compute what a change
 orphaned. A package under `internal/` cannot be reached from a sibling repo.
 
-- [ ] **Promote `related` — the `## Related skills` edge reader — to skillet.**
+- [x] **Promote `related` — the `## Related skills` edge reader — to skillet.** DONE
+  2026-08-27. Whole package, stdlib-only, with `TestImportsNothing`. exegesis switches to
+  it and deletes its copy once this releases.
   **Promote-on-second-consumer, and this is the second consumer.** exegesis has ten
   callers (`link`, `index`, `relate`, `normalize`, `verify`, `indexgen`, `mergemigrate`,
   `distill`, `scaffold`, plus its own internal one); skillsaw needs `ParseSection` and the
@@ -2022,7 +2024,27 @@ orphaned. A package under `internal/` cannot be reached from a sibling repo.
   point invented for skillsaw's convenience would be a shared package designed for one
   caller's shape.
 
-- [ ] **`related` reads under half the edges a real corpus declares.** Measured
+- [x] **`related` reads under half the edges a real corpus declares.** DONE 2026-08-27 —
+  **222 edges before, 326 after**, on the same 233-skill corpus.
+
+  Each dialect was traced to where it died rather than patched by guess, and two of the
+  three died in the same place: `canonicalKind`, which its own doc already called *"the
+  single gate every orientation passes through"*. One `spelling()` step — emphasis
+  stripped, underscore read as hyphen — handles both, scoped to the kind token because a
+  rationale legitimately contains emphasis. The third died in `splitReversedDash`, whose
+  `Cut` on `":"` finds nothing in `*depends-on* → why`; an arrow is now an alternative
+  separator, tried after the colon so a rationale containing an arrow cannot be mistaken
+  for one.
+
+  **The recorded refusals are now asserted rather than trusted.** `prerequisite for` stays
+  absent — it is the inverse of `depends-on`, and reading it without flipping would reverse
+  real edges — and `isSlug` still keeps a bold display title out of the reversed
+  orientation. Both have tests, so the new tolerance cannot quietly erode them.
+
+  What remains unreadable is the display-title form, which is not a parsing problem: only
+  something that has walked the tree can resolve a title, and exegesis's
+  `normalize --resolve-titles` reports 53 of 97 resolvable. Rewriting those waits on
+  nothing else now — this was its prerequisite. Original entry:
   2026-08-27 over `steve-skill-market` (233 skills): the parser resolves **222 edges from
   520 related-skill bullets**, after `exegesis normalize` had already converted 117 skills.
   The remainder sit in dialects `dialects.go` does not accept:
