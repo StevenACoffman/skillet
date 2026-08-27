@@ -2066,3 +2066,44 @@ orphaned. A package under `internal/` cannot be reached from a sibling repo.
   check, and the orphan gate now filed in skillsaw — sees a graph missing more than half
   its edges and cannot tell. Fix before the orphan gate ships: an orphan count over 222 of
   520 declared relationships would be confidently wrong.
+
+## `manifest.Skill` Records No Edges, So Diff Cannot Answer "What Was Orphaned" (2026-08-27)
+
+Source: siting skillsaw's orphan gate. Decided 2026-08-27; filed here because the kernel
+type is the load-bearing part.
+
+- [ ] **`manifest.Skill` gains the edge targets a skill declares.** `Diff(base, cur)`
+  reports which skills changed and never what the baseline's graph was, so
+  `NewlyOrphanedEndpoints` — the meter the whole gate is built on — is not computable from
+  the inputs. An edge disappears when a skill is removed or when a surviving skill drops a
+  bullet; the first is invisible because the skill is gone, the second because its old body
+  is. **A hash says the body moved, not what it said.**
+
+  **This is the `TestPromptsHash` precedent, word for word.** That field exists because *"a
+  manifest records that a skill has test prompts and nothing about what they say… the only
+  thing comparing versions is Diff, and it had nothing to compare on."* Substitute edges
+  and the sentence is unchanged. The family has already accepted that a manifest may record
+  *enough of* content for Diff to answer a question.
+
+  **Targets only, not edges.** Orphaning is about an inbound edge *existing*, not its kind
+  or its rationale, and `Convention` reads the current tree where it belongs. Measured on
+  the 233-skill market corpus: an adjacency list of targets is **~9.7 KiB against a 47 KiB
+  manifest, about +20%** — storing full `Edge` structs would be triple that and would make
+  the manifest a copy of the prose.
+
+  Two requirements, both failure modes rather than preferences:
+
+  - **Absent must mean *unknown*, never *no edges*.** A nil slice omitted by `omitempty` is
+    a manifest written before this existed; `[]` is a skill known to declare none. Collapse
+    them and the first run against an old manifest reports every edge as newly added and
+    every node as newly orphaned. This is the same distinction `TestPromptsHash` already
+    documents as load-bearing, and it is what makes `BaseAvailable` fall out for free
+    rather than being bolted on.
+  - **Both producers in one change.** `exegesis verify` and `skillsaw inventory` both call
+    `Build`. A field one writes and the other does not is skew that surfaces as phantom
+    diffs, and it would be diagnosed as a gate bug rather than a producer gap.
+
+  **Caveat carried from the decision: measure before trusting the gate's output.** The
+  readable graph moved from 222 to 357 edges on 2026-08-27 alone, and 44 display titles
+  plus several out-of-vocabulary kinds are still unread. An orphan count is only as good as
+  the graph beneath it, and that graph is young.
