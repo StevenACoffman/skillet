@@ -16,13 +16,17 @@ import (
 )
 
 // FormatVersion is the canonical-form major version this package writes and is the
-// highest it can read. It is 1: adding the ability to declare a version changed no
-// grammar, so nothing needs re-writing.
+// highest it can read.
 //
 // Bump it only when the grammar itself changes -- not to record provenance, tool identity
 // or scoring metadata. identity.Hash already pins which bytes produced what, and a format
 // version that accumulates those becomes a second manifest.
-const FormatVersion = 1
+//
+// It is 2. Version 1 was the version reader itself, which changed no grammar; version 2
+// adds the ⚖ warrant marker, which does. A document is only *written* as 2 when it uses
+// that marker -- see formatOf -- so every ruleset written before it still renders
+// byte-identically, which is the property the reader was shipped early to protect.
+const FormatVersion = 2
 
 // Severity is how strictly a Rule is enforced.
 const (
@@ -60,6 +64,10 @@ type Rule struct {
 	Bad          string // the ✗ counter-example
 	Good         string // the ✓ preferred form
 	SourceAnchor string // the ↦ source quote or section this rule derives from
+
+	// Warrant is the ⚖ record of a decision, for a rule no source can anchor. Its zero
+	// value means the rule was never adjudicated, which is the ordinary case.
+	Warrant Warrant
 }
 
 // Ruleset is a distilled set of Rules derived from one source.
@@ -138,6 +146,29 @@ func readFormat(md string) (format int, body string, err error) {
 //
 // Written by hand rather than marshalled. The canonical form's promise is byte-stability,
 // and a marshaller's key order, quoting and line endings are its choice rather than ours.
+// formatOf returns the lowest canonical-form version that can express rs.
+//
+// The version is derived from what the document uses rather than read from the field a
+// caller set, because those can disagree and only one of them is true. A ruleset carrying a
+// warrant but declaring version 1 would render a ⚖ line under no version block: a v1 reader
+// rejects it, so nothing is silently mis-parsed, but the file would describe itself
+// wrongly and the next tool to round-trip it would report drift that is not there.
+//
+// Ensures: pure. Never below 1, so a Ruleset built in Go without setting Format is a valid
+// v1 document rather than a malformed one, and never above what its content requires, which
+// is what keeps a corpus of warrant-free rulesets rendering byte-identically.
+func formatOf(rs Ruleset) int {
+	for i := range rs.Rules {
+		if rs.Rules[i].Warrant.Present() {
+			return 2
+		}
+	}
+	if rs.Format > 1 {
+		return rs.Format
+	}
+	return 1
+}
+
 func renderFormat(format int) string {
 	if format <= 1 {
 		return ""
@@ -153,7 +184,7 @@ func renderFormat(format int) string {
 // the two agree on what a version-less ruleset is.
 func Render(rs Ruleset) string {
 	var b strings.Builder
-	b.WriteString(renderFormat(rs.Format))
+	b.WriteString(renderFormat(formatOf(rs)))
 	fmt.Fprintf(&b, "Source: %s\n", rs.Source)
 	fmt.Fprintf(&b, "Scope:  %s\n", rs.Scope)
 	for i := range rs.Rules {
@@ -171,6 +202,10 @@ func Render(rs Ruleset) string {
 		}
 		if r.SourceAnchor != "" {
 			fmt.Fprintf(&b, "%s↦  %s\n", indent, r.SourceAnchor)
+		}
+		if r.Warrant.Present() {
+			fmt.Fprintf(&b, "%s⚖  %s %s  %s\n",
+				indent, r.Warrant.By, r.Warrant.At, r.Warrant.Rationale)
 		}
 	}
 	return b.String()

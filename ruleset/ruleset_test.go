@@ -2,6 +2,7 @@ package ruleset_test
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode"
@@ -142,7 +143,11 @@ func TestAnUnknownMarkerIsNotRationale(t *testing.T) {
 // should not have to rediscover it.
 func TestANewerFormatIsRefused(t *testing.T) {
 	t.Parallel()
-	_, err := ruleset.Parse("---\nformat: 2\n---\nSource: x\n\n§4.1  [MUST][CODE]  Close rows\n")
+	// FormatVersion+1 rather than a literal: this test hardcoded 2, which stopped being a
+	// future version the day the warrant marker made 2 the current one.
+	doc := "---\nformat: " + strconv.Itoa(ruleset.FormatVersion+1) +
+		"\n---\nSource: x\n\n§4.1  [MUST][CODE]  Close rows\n"
+	_, err := ruleset.Parse(doc)
 	if err == nil {
 		t.Fatal("a format newer than this parser understands was accepted")
 	}
