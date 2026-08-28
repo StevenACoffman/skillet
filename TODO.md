@@ -1026,7 +1026,7 @@ met before the knowledge-base tool exists at all.
     adoption is incremental by specification.
   When it does land it belongs **in the one consumer that needs it** until a second appears,
   exactly as `quotecheck` stayed in exegesis.
-- [ ] **Adjudication is a distinct artifact from detection, and has no type yet.** When two
+- [x] **Adjudication is a distinct artifact from detection.** DONE 2026-08-27 — see the entry below. Original entry: When two
   rules conflict and a human picks one, the decision is knowledge present in neither source
   — so it can carry no `↦` anchor and **fails `verify.Provenance` by construction.** That
   is the highest-value thing the team produces and the corpus has nowhere to put it. Shape,
@@ -2079,11 +2079,29 @@ type is the load-bearing part.
   bullet; the first is invisible because the skill is gone, the second because its old body
   is. **A hash says the body moved, not what it said.**
 
-  **This is the `TestPromptsHash` precedent, word for word.** That field exists because *"a
-  manifest records that a skill has test prompts and nothing about what they say… the only
-  thing comparing versions is Diff, and it had nothing to compare on."* Substitute edges
-  and the sentence is unchanged. The family has already accepted that a manifest may record
-  *enough of* content for Diff to answer a question.
+  **The `TestPromptsHash` precedent was cited for this and only half of it transfers.**
+  Corrected 2026-08-27 after the claim was challenged and checked. That field exists
+  because *"a manifest records that a skill has test prompts and nothing about what they
+  say… the only thing comparing versions is Diff, and it had nothing to compare on"*, and
+  that half does carry over: a manifest may record *enough of* content for Diff to answer a
+  question, which the family has accepted once already.
+
+  **What does not carry over is the axis.** `TestPromptsHash` earns `Axes.TestPrompts`
+  because test-prompts are a **separate file**, so "only the prompts changed" is a real
+  state — `TestDiffReportsWhichFileMoved` constructs it with `h1→h1, p1→p2`. Edges live
+  *inside* SKILL.md, so any edge change necessarily moves `Hash`: `Edges ⇒ Skill`, always.
+  The corresponding control row, `Axes{Edges: true, Skill: false}`, describes a state a
+  real tree cannot produce, and a test asserting it would be asserting a world that does
+  not exist.
+
+  **So no `Axes.Edges`.** It is not merely redundant — `Skill` says the file moved and an
+  edges bit would say *which part* moved, which is a real refinement — but once the targets
+  are stored the refinement is computable from them for free, and a stored bit is a second
+  thing that can disagree with the data it summarises.
+
+  **The field survives on its own merit, which was never change-detection.** `Hash` says
+  the body moved; it cannot say what the old adjacency *was*. That is the only thing the
+  gate needs and the one thing no hash can supply.
 
   **Targets only, not edges.** Orphaning is about an inbound edge *existing*, not its kind
   or its rationale, and `Convention` reads the current tree where it belongs. Measured on
@@ -2107,3 +2125,68 @@ type is the load-bearing part.
   readable graph moved from 222 to 357 edges on 2026-08-27 alone, and 44 display titles
   plus several out-of-vocabulary kinds are still unread. An orphan count is only as good as
   the graph beneath it, and that graph is young.
+
+## The Warrant, the Shared Rule, and Manifest Edges (2026-08-27)
+
+Three items, and the first thing worth recording is that **the adjudication entry's own
+blocker had cleared and nobody noticed.** It named L745 — *"cannot be added safely until the
+format version ships"* — and the version reader shipped 2026-08-16. Its other hold, *"one
+prospective consumer is not evidence for a type"*, its own 2026-08-22 review had already
+retracted. Both reasons had expired while the entry still read as held.
+
+**The shared rule landed as `Warrant`'s doc comment, not as prose.** The entry called it
+extractable *"at no cost, because it is not the type"* — true while the type did not exist;
+once it does, the type is where a reader meets the rule at the moment it matters. gnosis's
+formulation is quoted verbatim, as the entry nominated.
+
+**`Warrant{By, At, Rationale}` on `ruleset.Rule`, and nothing else.** No tiers, no
+co-signers, no reversal links. `Rule.Rationale` already means something else, so the warrant
+is nested rather than three more fields.
+
+- **`At` is a `string`, which is the weaker choice by §4 and the right one here.**
+  `time.Time` would model the constraint in the type and would silently rewrite `2026-8-27`
+  as `2026-08-27` on round-trip — and byte-identical round-tripping is what canonizer's
+  drift check and the inert-render property both rest on. Validity is enforced at the parse
+  boundary with `Valid()`, mirroring `Severity.Valid`. The residue is documented: a Ruleset
+  built in Go rather than parsed can hold a malformed `At` until someone checks.
+- **A half-recorded warrant is a parse error.** It is the only record of a decision carrying
+  no other evidence, so a partial one looks like provenance while establishing nothing.
+- **`marker.set` gained an `error` return** rather than special-casing `⚖` inside
+  `applyBody`. Three markers cannot fail and return nil; a special-purpose branch in a
+  general mechanism is the shape this form avoids.
+
+**`FormatVersion` is 2, and the declared version is now derived rather than trusted.** A new
+marker is the documented bump trigger. The trap is a ruleset carrying a warrant while
+declaring version 1: a v1 reader rejects the `⚖` line, so nothing mis-parses, but the file
+misdescribes itself. `formatOf` returns the lowest version that can express the content, so
+a document cannot contradict its own declaration and the caller cannot forget.
+
+**A guard the code claimed and did not have.** `markers()`' doc says it is one place because
+there are *"two readers: applyBody, and the test asserting that FormatVersion was bumped when
+the set changed."* There was no such test — `TestEveryMarkerIsNonASCII` checks a different
+property. Written now as `TestFormatVersionTracksTheMarkerSet`, and it caught the intended
+failure: reverting the bump reports *"FormatVersion 1 expects 3 markers, found 4"*. A comment
+describing an intention as though it were a check is the shape this file calls out elsewhere.
+
+Also found and fixed: `TestANewerFormatIsRefused` hardcoded `format: 2` as the future
+version, which stopped being true the moment 2 became current. Now `FormatVersion+1`.
+
+**`manifest.Skill.Edges` — recorded, not diffed.** `map[string][]string`, kind to sorted
+targets, because `manifest` is stdlib-only and `ruleset` giving that up is recorded here as
+a cost. Edges live in SKILL.md, so any edge change already moves `Hash` and surfaces as
+`Axes.Skill`; feeding them to `axes` as well would report one change on two axes. The
+control confirms it — wiring edges into `axes` fails `TestEdgesAreRecordedNotDiffed`.
+
+- [ ] **The inert-render property is proven on a fixture, not on the corpus.** The format
+  entry's standard was *"all 29 stored rulesets render byte-identically… proven on the real
+  corpus rather than fixtures"*, and no canonical-form ruleset is checked out on this
+  machine — 59 files carry `§` lines and none parses as the form. So
+  `TestAWarrantFreeRulesetStillRendersNoBlock` proves byte-identical round-trip on a v1
+  fixture and nothing proves it on the 29. Re-run the check where that corpus lives before
+  treating the inert claim as established to the standard the earlier entry set.
+- [ ] **`manifest.Skill.Edges` has no producer and no consumer yet.** skillsaw's orphan gate
+  reads the graph from a baseline *tree*, deliberately: one parser, one version, no drift.
+  Edges exist for the case a tree cannot serve — a published manifest whose checkout is
+  gone — and wiring the gate to them would create the second answer to one question that
+  L1228 names as the defect this repo exists to prevent. Leave one answer in use until
+  something actually needs the other.
