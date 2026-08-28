@@ -2072,7 +2072,15 @@ orphaned. A package under `internal/` cannot be reached from a sibling repo.
 Source: siting skillsaw's orphan gate. Decided 2026-08-27; filed here because the kernel
 type is the load-bearing part.
 
-- [ ] **`manifest.Skill` gains the edge targets a skill declares.** `Diff(base, cur)`
+- [x] **`manifest.Skill` gains the edge targets a skill declares.** DONE — shipped in
+  `06c4a3d` + `21548f1` with `Edges map[string][]string`, `Manifest.EdgesRecorded`, and five
+  tests (`TestEdgesAreRecordedNotDiffed`, `…SurviveTheRoundTrip`, `…OmitsTheField`,
+  `…DistinguishesUnreadFromEmpty`, `…PredatingTheField`). The box stayed open after the work
+  landed, which is the same failure this file catches in the other direction: a shipped
+  thing recorded as unbuilt reads as work outstanding, and the next pass re-derives it.
+  Checked against the code and a green run before ticking, 2026-08-27. The design notes
+  below stand as written; see also *"The Warrant, the Shared Rule, and Manifest Edges"*.
+  Original entry: `Diff(base, cur)`
   reports which skills changed and never what the baseline's graph was, so
   `NewlyOrphanedEndpoints` — the meter the whole gate is built on — is not computable from
   the inputs. An edge disappears when a skill is removed or when a surviving skill drops a
@@ -2184,9 +2192,241 @@ control confirms it — wiring edges into `axes` fails `TestEdgesAreRecordedNotD
   `TestAWarrantFreeRulesetStillRendersNoBlock` proves byte-identical round-trip on a v1
   fixture and nothing proves it on the 29. Re-run the check where that corpus lives before
   treating the inert claim as established to the standard the earlier entry set.
-- [ ] **`manifest.Skill.Edges` has no producer and no consumer yet.** skillsaw's orphan gate
+  **Re-run 2026-08-27, and the entry stands: still nothing to check it against.** Every file
+  under `git/`, `agent-orange/`, `agent-red/`, `agent-blue/` and `agent-green/` carrying a
+  `§`-prefixed line was fed to `ruleset.Parse`: **66 candidates, 0 parsing as a ruleset**
+  (the count has grown from 59; what it measures has not changed — these are prose documents
+  that use the section sign, not stored rulesets). Recorded rather than left silent because
+  a check nobody can run and a check that passes read the same in a backlog, and only one of
+  them means the property holds.
+- [x] **`manifest.Skill.Edges` has no producer and no consumer yet.** OVERTAKEN 2026-08-27,
+  the same day, and the entry's concern was honoured rather than overruled — worth recording
+  because the two look alike from the outside.
+  skillsaw now has both halves: `inventory.Entry` records the edges off the same
+  `skill.Load` that produces the hash and `inventory.Tree` sets `EdgesRecorded`; `skillsaw
+  orphans --base-manifest FILE` reads them back. **`--base-tree` remains the preferred path
+  and the help text says so in those words**, for exactly the reason below: two trees go
+  through one parser at one version and cannot drift from themselves, while a recorded edge
+  is a snapshot that can. The manifest path is scoped to the case this entry names — the
+  checkout is gone.
+  The second-answer risk is bounded by refusal rather than by leaving the field unused: a
+  manifest with `EdgesRecorded == false` is **refused**, not surveyed and not reported clean,
+  since a tree declaring no edges and a tree nobody asked are the same bytes. Verified
+  against a real `exegesis`-written manifest, which is refused today.
+  Still outstanding, and filed in skillsaw: **`exegesis verify` does not record edges**, so
+  it is the only producer that matters and the consumer is unexercisable in production until
+  it does. The kind→targets conversion should be promoted here first — this is the second
+  consumer, which is what promotes — as `related.EdgeMap`/`EdgesFrom`, since `manifest` is
+  stdlib-only and cannot hold it. Original entry: skillsaw's orphan gate
   reads the graph from a baseline *tree*, deliberately: one parser, one version, no drift.
   Edges exist for the case a tree cannot serve — a published manifest whose checkout is
   gone — and wiring the gate to them would create the second answer to one question that
   L1228 names as the defect this repo exists to prevent. Leave one answer in use until
   something actually needs the other.
+
+## `related.TitleRefs` Reports the Kinds of Well-Formed Bullets (2026-08-27)
+
+Source: building skillsaw's orphan-gate coverage report. The caveat two sections up —
+*"44 display titles plus several out-of-vocabulary kinds are still unread. An orphan count
+is only as good as the graph beneath it"* — asks a consumer to say how much of the graph it
+could see. `TitleRefs` is the obvious instrument for the display-title half. It cannot be
+used for it, and the way it fails is the flattering direction.
+
+Measured over two real trees, through `related.ParseSection` and `related.TitleRefs` at
+v0.26.0:
+
+| tree | skills | edges read | TitleRefs | resolved |
+| ---- | ------ | ---------- | --------- | -------- |
+| `~/.claude/skills` | 288 | 426 | **339** | 6 |
+| `~/.agents/skills` | 285 | 397 | **251** | 0 |
+
+339 display-title references against 426 edges would mean the parser was missing most of
+the corpus. It is not. The first five on both trees are:
+
+```text
+ref: from=10x9-cost-reliability        title="composes-with"  res=unknown
+ref: from=3ts-premature-optimization   title="contrasts-with" res=unknown
+ref: from=aggregation-workflow-four-steps title="depends-on"  res=unknown
+```
+
+**These are the kind tokens of bullets `ParseSection` read correctly**, reported as
+unresolved display titles.
+
+- [x] **`TitleRefs`' kind filter does not match the canonical kinds.** DONE 2026-08-27, as
+  filed: `isKindToken` asks `canonicalKind` instead of testing the token's shape, so the
+  gate every orientation already passes through is the one that decides this too, and a
+  kind spelling added later cannot come back as a phantom title.
+  **The failing row went in first and failed exactly as this entry predicted**, which is
+  what makes the four-row table worth keeping rather than replacing: it named the right rule
+  and passed only because the canonical-kind-in-bold combination was the one it did not
+  reach.
+  **Measured on the two trees this entry measured, one binary, before against after:**
+  `~/.claude/skills` **339 → 185** title refs, `~/.agents/skills` **251 → 119** — and
+  *resolved is unchanged at 59 and 53*, which is the assertion that matters. Nothing real
+  was filtered out; only the phantoms went. The ratio the instrument exists to report goes
+  from 59-of-339 to 59-of-185.
+  (This pass counts more resolved than the table above because it builds each `Node` with
+  `Heading: related.Heading(s.Body)`, the way `indexgen.CollectNodes` does; an index built
+  from nodes with no `Heading` resolves nothing, which is worth knowing before quoting
+  either number.)
+  **One cost, found by probing rather than by reading, and now stated in the code:** a skill
+  whose display title *is* a kind — the `dependency-direction` / "Depends On" node this
+  entry's own fixture gained — becomes unreachable through this report, because
+  `canonicalKind` folds case and spacing and cannot tell the two apart from one token. The
+  guess is made in the safe direction: an unreported reference stays visibly unrewritten,
+  where a wrongly reported one becomes an edge indistinguishable from an authored one.
+  Original entry: `boldLeads` returns
+  the bold token at the head of *every* bullet in a related-skills section, so the
+  well-formed `- **composes-with** ` + "`slug`" + `: why` contributes `composes-with`.
+  `TitleRefs` filters that population with:
+
+  ```go
+  if slugs[tok] || strings.Contains(tok, "_") {
+      continue // already a slug, or a kind in the bold position
+  }
+  ```
+
+  The comment states the intent exactly. The predicate does not implement it: **every
+  canonical kind is hyphenated** — `depends-on`, `composes-with`, `contrasts-with`,
+  `informs`, `superseded-by` — and none contains an underscore. The underscore case is the
+  `composes_with` dialect `spelling()` already normalises for the *parser*, so the filter
+  was written against the one spelling that had stopped reaching it.
+
+  The fix is to ask the vocabulary rather than the shape of the token: skip a bold lead that
+  `canonicalKind` recognises. It is unexported and in this package, it already routes
+  through `spelling()`, and `dialects.go`'s doc calls it *"the single gate every orientation
+  passes through"* — so a kind spelling added later cannot reappear here as a phantom title,
+  which a second hand-written list of kinds would allow.
+
+  **Reproduced in this repo, in one line, and the existing test is why it survived.**
+  `TestTitleRefsSkipsWhatIsNotATitle` already exists and its comment states the rule this
+  violates — *"a kind in the bold position … must not be reported here — reporting it would
+  inflate the count the dialect work is measured by"*. Its four rows are a display title, a
+  bold slug, a bold `composes_with`, and a canonical `- composes-with: ` + "`beta`". The
+  third is a kind in the bold slot in **the one spelling the filter catches**; the fourth is
+  canonical but **not bold**, so `boldLeads` never returns it. The row that would fail —
+  the canonical kind *in bold* — is the intersection the table does not reach. Adding
+
+  ```go
+  "- **composes-with** `beta` — the canonical kind, in bold\n" +
+  ```
+
+  fails it immediately: `refs = [{Title:Alpha Skill …} {Title:composes-with Resolution:unknown}]`.
+  A four-row table naming the right rule, passing, over the one combination that breaks it.
+
+- Note, not a separate item: **the denominator is why this matters rather than the
+  absolute count.** `TitleRefs`' doc says its value is naming *"which titles would
+  resolve, which is the input to deciding whether that work is worth it"*. At 6 of 339 that
+  input reads as 2% and argues the work is not worth doing; against the real population of
+  display titles — 44 by the caveat's own count, 53 of 97 resolvable by exegesis's
+  `normalize --resolve-titles` — it is a majority. A defect that makes a feature look not
+  worth building is worse than one that merely miscounts.
+
+- Note: **skillsaw declined to use it and says so in code.** `orphan.Coverage` reports
+  skills read, edges read, and dangling edges, and is documented as a **floor** naming both
+  uncounted classes rather than carrying a wrong number under a heading that claims to say
+  what the reader missed. Nothing is currently citing the 339, which is the reason this is
+  filed rather than urgent — but `exegesis` and `adh` both read the graph, and the next
+  consumer to reach for the obvious instrument gets the flattering number.
+
+- [x] **The predicate existed twice, and fixing one copy left them disagreeing.** DONE
+  2026-08-27, found while reading `titles.go` to verify the entry above. `TitleRefs` and
+  `resolvedTitleFor` each carried their own `strings.Contains(tok, "_")`; the fix landed in
+  the first only. **Two copies that agree are predictable and two that disagree are not**,
+  so the intermediate state was worse than the original defect — a reader could no longer
+  answer "does this package treat a bold kind as a title" without knowing which caller they
+  were in. `resolvedTitleFor` now calls `isKindToken` and the inline test is gone rather
+  than kept beside it.
+
+  **The second copy is the consequential one, which the original filing had backwards.**
+  It ranked this as a counting defect on a reporting function. `TitleRefs` reports;
+  `resolvedTitleFor` backs `ResolveTitles`, which **rewrites bullets on disk**. Planting
+  the old predicate back and running the new row shows the rewriter turn
+  `- **Depends On** — *composes-with* → why` into `- **dependency-direction** — …`,
+  converting a kind marker into a target: a wrong edge indistinguishable from an authored
+  one, which is precisely what `Resolve`'s exact-match-only rule exists to refuse.
+
+  **The rewriter's table was vacuous in the same way the reporter's was, and needed the
+  fixture to stop being so.** `TestResolveTitlesRewritesOnlyWhatItIsSureOf` had a
+  kind-in-the-bold-slot row over `composes_with` — the one spelling the old predicate
+  caught — and a hyphenated kind resolved to nothing under the old `tree()`, so a row for
+  it would have passed whatever the predicate said. That is why `tree()` gained
+  `dependency-direction` / "Depends On": only a heading that *is* kind-shaped makes the two
+  predicates disagree. Refusing that bullet is right even though it is genuinely
+  ambiguous — a missed rewrite stays visible and a wrong one does not — and it is the same
+  cost the entry above already records for the report.
+
+## `related` Owns the Manifest Edge Encoding (2026-08-27)
+
+Source: skillsaw shipped `orphans --base-manifest` and exegesis owes the producer half, so
+two tools are about to encode `manifest.Skill.Edges` — the second consumer that promotes.
+
+- [x] **`related.EdgeMap` and `related.EdgesFrom`.** DONE 2026-08-27, in `record.go`.
+  `EdgeMap([]Edge) map[string][]string` is kind to sorted unique targets; `EdgesFrom` is
+  the inverse, kinds ascending.
+  **Here rather than in `manifest`, and the field's own doc already gave the reason:**
+  `manifest` is stdlib-only, which is why `Edges` is a `map[string][]string` instead of a
+  `[]related.Edge` in the first place. So `manifest` owns how an edge is stored and this
+  package owns what an edge is; the translation belongs on the side that knows the second.
+  **The round trip is deliberately not identity** — kind and target survive, the rationale
+  does not — so the test asserts that rather than asserting a node comes back unchanged,
+  which would assert something the storage decision rejected.
+  **An unrecognised kind is preserved, not dropped.** `ParseSection` cannot produce one, so
+  a manifest from this family holds only known kinds; a hand-written or newer-tool one may,
+  and discarding it would make the recorded graph look smaller than the document says.
+  What an unknown kind is *worth* is the ranking consumer's decision, taken where the
+  ranking is. Pinned by a test that fails if `verifies` ever becomes a known kind, so it
+  cannot quietly go vacuous.
+  **Owed by the consumers, and not done here:** skillsaw carries an unexported copy
+  (`inventory.edgeMap`) that this replaces, and exegesis's `verify` records no edges at all.
+  Both wait on a release; see skillsaw's L2838.
+
+## Normalize Deleted Rationales the Dialect Work Taught It to Read (2026-08-27)
+
+Source: measuring `exegesis normalize` over the 233-skill market corpus after the v0.26.0
+bump. The reader got better and the rewrite got worse, which is the shape worth naming:
+**a formatter whose deletions are keyed on what it can parse deletes more every time
+parsing improves.**
+
+- [x] **`Normalize` deleted a bullet that restated a relationship in different words.**
+      DONE 2026-08-27. `canonicalize` dropped every target already in `seen` and returned
+      nothing when they all were, on the reasoning — written in the code — that the dropped
+      line "says the same thing as an earlier one". **In the corpus it does not.** 7 skills
+      state their relationships in two sections, and the second statement is the *longer*
+      one; normalizing deleted **27 bullets** and left each file holding an emptied heading,
+      while INDEX.md stayed byte-identical. The graph gained nothing and the documents lost
+      paragraphs.
+      **The rule is now one sentence, in `Normalize`'s doc and its `Ensures`: a bullet is
+      deleted only when its words are already on the bullet that survives.** A restatement
+      in different words is kept exactly as written — the same treatment a bullet the reader
+      cannot parse already gets, and for the same reason, that it carries prose existing
+      nowhere else. Which of two explanations is better is a judgement, and the file is where
+      a person makes it.
+      **The reader was deliberately not touched.** `newEdges`/`ParseSection` still dedupe by
+      (Kind, Target), because "which edges does this file declare" is a different question
+      from "may I delete this line" — the writer had inherited the reader's answer to a
+      question it was not asking. That split is what keeps `ParseSection(out) ==
+      ParseSection(md)` true while the writer keeps a second bullet.
+      **`isThematicBreak` recognised only `---`, so the merge never ran on the files it was
+      written for.** `mdformat` renders every rule as `______`, which is what all 7 carry, so
+      `mergeable` refused them and each was normalized in place — which is where the emptied
+      heading came from. It now accepts the three CommonMark characters; the spaced forms
+      are deliberately excluded, since `isBulletLine` reads `* * *` as a bullet and a line
+      that is both would make `mergeable` depend on which predicate ran first.
+      **Rationales are compared exactly.** A similarity test would delete a line on a score,
+      and the asymmetry governing all of this is that a deleted line is invisible afterwards
+      while a kept duplicate is plain to any reader. A restatement carrying *no* rationale
+      is still dropped: there is nothing to lose with it.
+      **Measured on a copy of the corpus, one binary, before against after:** bullets
+      **547 → 547** (was: 27 deleted), files losing bullets **0** (was 7), edges **428 →
+      428**, `exegesis` Mermaid edges **357 → 357**, graph notes **73 → 73**, INDEX.md
+      byte-identical, `normalize --check` clean afterwards, second pass a no-op. The word
+      multiset over all 50 rewritten files now loses **139 tokens, every one structural** —
+      kind spellings plus the 7 removed separators and duplicate headings — against 699
+      before, which had included `the` ×57 and `playbook` ×7.
+      **Three existing tests asserted the deletion and were changed, not worked around.**
+      `TestNormalize/duplicate relationship collapses` keeps its name and its point by making
+      both rationales identical: collapsing still happens where nothing is lost.
+      `TestNormalizeReadsTheUnderscoreDialect` likewise — it is about the *reader*, and it
+      now says so. `TestNormalizeMergeKeepsEveryEdgeAndTheFirstRationale` became
+      `…AndEveryRationale`, because that is what changed.
