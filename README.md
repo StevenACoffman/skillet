@@ -2,9 +2,11 @@
 
 **A Go toolkit for turning prose expertise into verifiable, runtime-neutral Agent Skills.**
 
-`skillet` is the shared kernel behind a family of tools. When two of them parse the same
-`SKILL.md`, hash the same artifact, or fold the same quotation, they must reach
-byte-identical answers. skillet provides that logic once, so the tools never drift apart.
+`skillet` is the shared kernel behind a family of tools. 
+
+**`skillet`** (Go library): The unified domain core. Holds common definitions, `speclint` frontmatter schemas, `redlines` quality rules, `skilllens` detectors, `testprompts`, `ratchet`, and `calibration` metrics. Ensures all downstream consumers have a single source of truth. For example, when two of them parse the same `SKILL.md`, hash the same artifact, or fold the same quotation, they must reach byte-identical answers. `skillet` provides that logic once, so the tools never drift apart.
+
+This `skillet` library powers the four specialized command-line tools, and those power the three agent skills.
 
 ## Who Uses It
 
