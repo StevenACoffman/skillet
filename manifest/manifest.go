@@ -21,6 +21,22 @@ type Manifest struct {
 	Tree              string  `json:"tree"`               // the verified tree path
 	StructureVerified bool    `json:"structure_verified"` // true iff every gate passed
 	Skills            []Skill `json:"skills"`
+
+	// EdgesRecorded says whether the producer populated Skill.Edges at all.
+	//
+	// **The question is about the manifest, not about any skill, which is why it lives
+	// here.** Per-skill nil cannot answer it: encoding/json omits a nil map and an empty
+	// one alike, so a skill that declares no edges and a skill whose edges were never
+	// read are the same bytes. A consumer needs to tell "compared against nothing" from
+	// "compared and found nothing" -- the timeseries.Verdict.Compared distinction -- and
+	// inferring it from "every skill has no edges" would be wrong for the one tree that
+	// genuinely has none.
+	//
+	// False on a manifest written before Edges existed, which is the case it is for. A
+	// producer that populates Edges and forgets this flag fails **closed**: the consumer
+	// reads the graph as unavailable and declines to report, rather than reporting a
+	// silent "no changes" against a baseline it never had.
+	EdgesRecorded bool `json:"edges_recorded,omitempty"`
 }
 
 // Skill is one verified skill's entry.
@@ -43,6 +59,27 @@ type Skill struct {
 	// and copying that rule would report every skill without test prompts as changed
 	// on every run.
 	TestPromptsHash string `json:"test_prompts_sha256,omitempty"`
+
+	// Edges is the skill's related-skills graph: edge kind to the slugs it points at,
+	// sorted. Empty when the skill declares none.
+	//
+	// It exists for the one question a manifest could not answer about a tree it no longer
+	// has: what the graph looked like. Whether a skill was orphaned by a change needs the
+	// baseline's edges, and Diff can say a body moved but never what it said. A consumer
+	// comparing two checkouts should read both trees instead -- one parser, one version, no
+	// drift -- and this is for the case where the baseline is a published artifact and the
+	// checkout is gone.
+	//
+	// map[string][]string rather than a related.Edge slice, deliberately: this package is
+	// stdlib-only, and the one other kernel package that gave that up recorded it as a cost.
+	// related.Kind is a string type, so a consumer converts without a decoder. The rationale
+	// on each edge is dropped -- the graph question needs kind and target, and prose would
+	// bloat a file kept for hashes.
+	//
+	// **Recorded, not diffed.** Edges live in SKILL.md, so any edge change already moves
+	// Hash and surfaces as Axes.Skill. Feeding them to axes as well would report one change
+	// on two axes and make every graph edit look like two.
+	Edges map[string][]string `json:"edges,omitempty"`
 }
 
 // Delta is the difference between two manifests, as tree-relative skill locations.

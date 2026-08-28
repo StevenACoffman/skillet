@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/StevenACoffman/skillet/manifest"
@@ -369,5 +370,139 @@ func TestChangedAxesIsKeyedByExactlyChanged(t *testing.T) {
 	total := len(d.Added) + len(d.Removed) + len(d.Changed) + len(d.Unchanged)
 	if total != 4 {
 		t.Errorf("the four slices hold %d locations, want the 4 in the union", total)
+	}
+}
+
+// TestEdgesAreRecordedNotDiffed is the double-count guard. A skill's edges live in its
+// SKILL.md, so any edit to them already moves Hash and shows up on Axes.Skill; feeding them
+// to axes as well would report one change on two axes and make every graph edit look like
+// two. The field exists to reconstruct a baseline graph, which is a different question from
+// staleness.
+//
+// The two manifests here differ only in Edges, which is a state a real tree cannot reach —
+// and that is the point: it isolates the axis under test from the hash that would otherwise
+// mask it.
+func TestEdgesAreRecordedNotDiffed(t *testing.T) {
+	t.Parallel()
+	withEdges := func(edges map[string][]string) manifest.Manifest {
+		s := manifest.Skill{Slug: "a", Dir: "a", Hash: "same", Edges: edges}
+		return manifest.Build("exegesis", "/t", []manifest.Skill{s}, true)
+	}
+	base := withEdges(map[string][]string{"composes-with": {"b"}})
+	cur := withEdges(map[string][]string{"contrasts-with": {"b"}})
+
+	d := manifest.Diff(base, cur)
+	if len(d.Changed) != 0 {
+		t.Errorf("an edge change was reported as a content change: %v", d.Changed)
+	}
+	if len(d.Unchanged) != 1 {
+		t.Errorf("Unchanged = %v, want the one skill whose hash did not move", d.Unchanged)
+	}
+}
+
+// TestEdgesSurviveTheRoundTrip keeps the field usable by the consumer it exists for: a tool
+// reading a published manifest whose tree is gone gets the graph back or gets nothing.
+func TestEdgesSurviveTheRoundTrip(t *testing.T) {
+	t.Parallel()
+	want := map[string][]string{"depends-on": {"b", "c"}, "informs": {"d"}}
+	m := manifest.Build("exegesis", "/t", []manifest.Skill{
+		{Slug: "a", Dir: "a", Hash: "h", Edges: want},
+	}, true)
+	b, err := m.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal() = %v", err)
+	}
+	back, err := manifest.Parse(b)
+	if err != nil {
+		t.Fatalf("Parse() = %v", err)
+	}
+	got := back.Skills[0].Edges
+	if len(got) != len(want) {
+		t.Fatalf("Edges = %v, want %v", got, want)
+	}
+	for kind, targets := range want {
+		if len(got[kind]) != len(targets) {
+			t.Fatalf("Edges[%q] = %v, want %v", kind, got[kind], targets)
+		}
+		for i, target := range targets {
+			if got[kind][i] != target {
+				t.Errorf("Edges[%q][%d] = %q, want %q", kind, i, got[kind][i], target)
+			}
+		}
+	}
+}
+
+// TestASkillWithoutEdgesOmitsTheField keeps the inert property for every manifest written
+// before this field existed: they must marshal identically, or a consumer diffing manifest
+// files reports drift on trees nobody touched.
+func TestASkillWithoutEdgesOmitsTheField(t *testing.T) {
+	t.Parallel()
+	m := manifest.Build("exegesis", "/t", []manifest.Skill{{Slug: "a", Dir: "a", Hash: "h"}}, true)
+	b, err := m.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal() = %v", err)
+	}
+	if strings.Contains(string(b), "edges") {
+		t.Errorf("a skill with no edges wrote the key anyway:\n%s", b)
+	}
+}
+
+// TestEdgesRecordedDistinguishesUnreadFromEmpty is the reason the flag is on the manifest
+// rather than inferred from the skills.
+//
+// encoding/json omits a nil map and an empty one alike, so a skill that declares no edges
+// and a skill whose edges were never read serialise identically. Without the flag a
+// consumer cannot tell "compared against nothing" from "compared and found nothing", and
+// would report a confident no-change against a baseline it never had.
+func TestEdgesRecordedDistinguishesUnreadFromEmpty(t *testing.T) {
+	t.Parallel()
+	// Two manifests whose skills are byte-identical on the wire, differing only in
+	// whether the producer claims to have read the graph.
+	skills := []manifest.Skill{{Slug: "a", Dir: "a", Hash: "h"}}
+	unread := manifest.Manifest{Tool: "t", Tree: ".", Skills: skills}
+	empty := manifest.Manifest{Tool: "t", Tree: ".", Skills: skills, EdgesRecorded: true}
+
+	for _, tc := range []struct {
+		name string
+		in   manifest.Manifest
+		want bool
+	}{
+		{"a producer that never read the graph", unread, false},
+		{"a producer that read it and found none", empty, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			data, err := tc.in.Marshal()
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			got, err := manifest.Parse(data)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if got.EdgesRecorded != tc.want {
+				t.Errorf("EdgesRecorded = %v, want %v", got.EdgesRecorded, tc.want)
+			}
+			// The skills themselves are indistinguishable, which is the point: the
+			// flag carries what the entries cannot.
+			if got.Skills[0].Edges != nil {
+				t.Errorf("Edges = %v, want nil in both cases", got.Skills[0].Edges)
+			}
+		})
+	}
+}
+
+// TestEdgesRecordedIsFalseOnAManifestPredatingTheField. The case the flag exists for: a
+// document written before it, which must read as "not recorded" rather than as "none".
+func TestEdgesRecordedIsFalseOnAManifestPredatingTheField(t *testing.T) {
+	t.Parallel()
+	const old = `{"tool":"exegesis","tree":".","structure_verified":true,` +
+		`"skills":[{"slug":"a","dir":"a","sha256":"h"}]}`
+	got, err := manifest.Parse([]byte(old))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if got.EdgesRecorded {
+		t.Error("a manifest with no edges_recorded key read as having recorded them")
 	}
 }
