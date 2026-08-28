@@ -132,7 +132,7 @@ func TitleRefs(nodes []Node) []TitleRef {
 	out := make([]TitleRef, 0)
 	for i := range nodes {
 		for _, tok := range boldLeads(nodes[i].Body) {
-			if slugs[tok] || strings.Contains(tok, "_") {
+			if slugs[tok] || isKindToken(tok) {
 				continue // already a slug, or a kind in the bold position
 			}
 			slug, res := resolveToken(titles, slugs, tok)
@@ -142,6 +142,31 @@ func TitleRefs(nodes []Node) []TitleRef {
 		}
 	}
 	return out
+}
+
+// isKindToken reports whether a bold lead is an edge kind rather than a display title.
+//
+// **It asks the vocabulary, not the shape of the token.** The test this replaced was
+// `strings.Contains(tok, "_")`, which reads as "kinds are the underscore dialect" — but
+// every canonical kind is hyphenated, so the one population it caught was `composes_with`,
+// the spelling `spelling()` had already stopped delivering here. Measured on two real
+// trees at v0.26.0, that let 339 well-formed bullets on a 426-edge tree be reported as
+// unresolved display titles, and 6 of 339 argues the dialect work is not worth doing.
+//
+// canonicalKind is the single gate every orientation already passes through, so a kind
+// spelling added later cannot reappear here as a phantom title — which a second list of
+// kind names kept beside it would allow.
+//
+// **The cost, stated rather than discovered later: a skill whose display title reads as a
+// kind is unreachable through this report.** canonicalKind folds case and spacing, so a
+// skill headed "Depends On" is skipped in the bold slot exactly as the kind is. One token
+// cannot distinguish them, and the corpus is hundreds of kinds against no such title, so
+// the guess is made in the direction that fails safely: an unreported reference stays
+// visibly unrewritten, while a wrongly reported one becomes an edge nobody can tell from
+// an authored one.
+func isKindToken(tok string) bool {
+	_, ok := canonicalKind(tok)
+	return ok
 }
 
 // resolveToken resolves one display title, falling back to a slug the author wrote
@@ -231,6 +256,13 @@ func ResolveTitles(body string, titles Titles, known map[string]bool) (string, i
 
 // resolvedTitleFor reports the slug a bullet's leading bold token resolves to, when that
 // token is a display title that resolves exactly and unambiguously.
+//
+// It asks isKindToken rather than repeating the test, and that is the whole point of the
+// helper existing: "is this bold token a kind rather than a title" is one decision, and it
+// was written here and in TitleRefs as two copies of `strings.Contains(tok, "_")`. Fixing
+// one left them disagreeing, which is worse than both being wrong — a caller reading
+// either could not tell which answer the package gives. This is the copy that matters,
+// because ResolveTitles rewrites bullets on disk.
 func resolvedTitleFor(text string, titles Titles, known map[string]bool) (string, bool) {
 	rest, ok := strings.CutPrefix(strings.TrimSpace(text), "- **")
 	if !ok {
@@ -241,7 +273,7 @@ func resolvedTitleFor(text string, titles Titles, known map[string]bool) (string
 		return "", false
 	}
 	tok := rest[:end]
-	if known[tok] || strings.Contains(tok, "_") {
+	if known[tok] || isKindToken(tok) {
 		return "", false // already a slug, or a kind in the bold position
 	}
 	slug, res := resolveToken(titles, known, tok)

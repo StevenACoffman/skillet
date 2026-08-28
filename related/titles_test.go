@@ -16,6 +16,11 @@ func tree() []related.Node {
 		{Slug: "gamma-one", Heading: "Shared Heading"},
 		{Slug: "gamma-two", Heading: "Shared Heading"},
 		{Slug: "no-heading"},
+		// A skill whose heading reads as an edge kind. It is what makes the
+		// kind-in-the-bold-slot rows discriminating rather than vacuous: without a
+		// heading to match, a bold kind is left alone by resolving to nothing, and the
+		// row would pass whatever the skip predicate said.
+		{Slug: "dependency-direction", Heading: "Depends On"},
 	}
 }
 
@@ -76,7 +81,11 @@ func TestTitleRefsSkipsWhatIsNotATitle(t *testing.T) {
 			"- **Alpha Skill** — *depends-on* → a title\n" +
 			"- **alpha** — *depends-on* → already a slug\n" +
 			"- **composes_with**: beta — a kind in the bold slot\n" +
-			"- composes-with: `beta` — canonical, not bold\n",
+			"- composes-with: `beta` — canonical, not bold\n" +
+			// The row the table never reached: a canonical kind, hyphenated, in the
+			// bold slot. It is the intersection of "is a kind" and "is bold", and it
+			// is the population the real corpus is mostly made of.
+			"- **composes-with** `beta` — the canonical kind, in bold\n",
 	})
 	refs := related.TitleRefs(nodes)
 	if len(refs) != 1 {
@@ -161,6 +170,16 @@ func TestResolveTitlesRewritesOnlyWhatItIsSureOf(t *testing.T) {
 		name: "a kind in the bold position is not a title",
 		body: head + "- **composes_with**: alpha — why\n",
 		want: head + "- **composes_with**: alpha — why\n", n: 0,
+	}, {
+		// The row the underscore one above cannot reach, and the one with teeth: a
+		// kind that is also a real heading in this tree. Resolving it would rewrite
+		// "**Depends On**" to "**dependency-direction**" and turn a kind marker into a
+		// target — a wrong edge indistinguishable from an authored one, which is the
+		// exact failure the whole lookup is built to refuse. Refusing is right even
+		// though the bullet is genuinely ambiguous: a missed rewrite stays visible.
+		name: "a kind that is also a heading is still not a title",
+		body: head + "- **Depends On** — *composes-with* → why\n",
+		want: head + "- **Depends On** — *composes-with* → why\n", n: 0,
 	}, {
 		// Prose outside the section must never be rewritten, however it reads.
 		name: "text outside a related section is untouched",
