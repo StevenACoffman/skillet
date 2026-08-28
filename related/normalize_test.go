@@ -66,11 +66,41 @@ func TestNormalize(t *testing.T) {
 				"- composes-with: `beta` — \n",
 			wantChanged: true,
 		},
-		"duplicate relationship collapses": {
+		"duplicate relationship collapses when the words are the same": {
 			in: "## Related Skills\n\n" +
-				"- **composes-with** [`alpha`](../alpha/SKILL.md): legacy wording\n" +
-				"- composes-with: `alpha` — canonical wording\n",
-			want:        "## Related Skills\n\n- composes-with: `alpha` — legacy wording\n",
+				"- **composes-with** [`alpha`](../alpha/SKILL.md): the one wording\n" +
+				"- composes-with: `alpha` — the one wording\n",
+			want:        "## Related Skills\n\n- composes-with: `alpha` — the one wording\n",
+			wantChanged: true,
+		},
+		// The same collapse would delete an explanation, so it does not happen: the
+		// second bullet stays exactly as written, legacy form and all.
+		"duplicate relationship in other words is kept": {
+			in: "## Related Skills\n\n" +
+				"- composes-with: `alpha` — the first explanation\n" +
+				"- **composes-with** [`alpha`](../alpha/SKILL.md): a different explanation\n",
+			want: "## Related Skills\n\n" +
+				"- composes-with: `alpha` — the first explanation\n" +
+				"- **composes-with** [`alpha`](../alpha/SKILL.md): a different explanation\n",
+			wantChanged: false,
+		},
+		// One restated target is enough to keep the whole line: splitting it would
+		// write the new target canonically and leave the restated one nowhere.
+		"multi-target bullet restating one of its targets is kept whole": {
+			in: "## Related Skills\n\n" +
+				"- depends-on: `alpha` — the first reason\n" +
+				"- depends-on: `alpha`, `beta` — a different reason\n",
+			want: "## Related Skills\n\n" +
+				"- depends-on: `alpha` — the first reason\n" +
+				"- depends-on: `alpha`, `beta` — a different reason\n",
+			wantChanged: false,
+		},
+		// A restatement carrying no rationale has no words to lose, so it still goes.
+		"duplicate relationship with no rationale collapses": {
+			in: "## Related Skills\n\n" +
+				"- composes-with: `alpha` — the only explanation\n" +
+				"- composes-with: `alpha`\n",
+			want:        "## Related Skills\n\n- composes-with: `alpha` — the only explanation\n",
 			wantChanged: true,
 		},
 		"suffixed heading becomes canonical": {
@@ -174,10 +204,13 @@ func TestNormalizeMergesASecondSection(t *testing.T) {
 		"- depends-on: `alpha` — restated in other words\n\n" +
 		"---\n\n" +
 		"## Audit Information\n"
+	// The restatement moves with the rest: it explains the same relationship in other
+	// words, and those words are on no other line.
 	want := "# Body\n\n## Related Skills\n\n" +
 		"- depends-on: `alpha` — first\n" +
 		"- contrasts-with: (prose, not a skill)\n" +
-		"- composes-with: `beta` — second\n\n" +
+		"- composes-with: `beta` — second\n" +
+		"- depends-on: `alpha` — restated in other words\n\n" +
 		"---\n\n" +
 		"## Audit Information\n"
 
@@ -193,7 +226,10 @@ func TestNormalizeMergesASecondSection(t *testing.T) {
 	}
 }
 
-func TestNormalizeMergeKeepsEveryEdgeAndTheFirstRationale(t *testing.T) {
+// TestNormalizeMergeKeepsEveryEdgeAndEveryRationale pins the trade this makes: merging
+// two sections collapses the *headings*, never the explanations. Both statements of one
+// relationship survive; the reader still reports one edge for them.
+func TestNormalizeMergeKeepsEveryEdgeAndEveryRationale(t *testing.T) {
 	t.Parallel()
 	in := "## Related Skills\n\n- depends-on: `alpha` — the reason that was written first\n\n" +
 		"## Related Skills\n\n- depends-on: `alpha` — a later, different reason\n" +
@@ -203,14 +239,19 @@ func TestNormalizeMergeKeepsEveryEdgeAndTheFirstRationale(t *testing.T) {
 	if strings.Count(out, "## Related Skills") != 1 {
 		t.Errorf("expected one section after merging, got:\n%s", out)
 	}
-	if strings.Count(out, "`alpha`") != 1 {
-		t.Errorf("the repeated relationship should be written once, got:\n%s", out)
+	for _, want := range []string{
+		"the reason that was written first",
+		"a later, different reason",
+		"- composes-with: `beta` — only in the second section",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("%q was lost in the merge, got:\n%s", want, out)
+		}
 	}
-	if !strings.Contains(out, "the reason that was written first") {
-		t.Errorf("the first section's rationale should win, got:\n%s", out)
-	}
-	if !strings.Contains(out, "- composes-with: `beta` — only in the second section") {
-		t.Errorf("an edge unique to the second section was lost:\n%s", out)
+	// Two bullets, one relationship: the duplication is the document's, and the reader
+	// is what resolves it.
+	if got := len(related.ParseSection(out)); got != 2 {
+		t.Errorf("edges = %d, want 2 (alpha and beta):\n%s", got, out)
 	}
 }
 
@@ -263,10 +304,14 @@ func TestNormalizeMergeMovesABulletItCannotParse(t *testing.T) {
 // TestNormalizeReadsTheUnderscoreDialect is the other half of the change above: the
 // underscore spelling now parses, so a section repeating an edge in that dialect collapses
 // to one canonical bullet rather than keeping both.
+//
+// Both bullets carry the same rationale, which is what makes the collapse free. Told in
+// different words the second bullet would be kept — see
+// TestNormalizeKeepsARestatementInOtherWords, which is the case the real corpus has.
 func TestNormalizeReadsTheUnderscoreDialect(t *testing.T) {
 	t.Parallel()
 	in := "## Related Skills\n\n- depends-on: `alpha` — first\n\n" +
-		"## Related Skills\n\n- **depends_on**: alpha — the same edge, other spelling\n"
+		"## Related Skills\n\n- **depends_on**: alpha — first\n"
 
 	out, _ := related.Normalize(in)
 	if strings.Contains(out, "depends_on") {
@@ -275,5 +320,48 @@ func TestNormalizeReadsTheUnderscoreDialect(t *testing.T) {
 	if got := strings.Count(out, "- depends-on: `alpha`"); got != 1 {
 		t.Errorf("canonical depends-on bullets = %d, want the duplicate collapsed:\n%s",
 			got, out)
+	}
+}
+
+// TestNormalizeKeepsARestatementInOtherWords is the shape 7 skills in the real market
+// corpus carry: two related-skills sections, separated by the underscore thematic break
+// mdformat writes, whose second section states the same five relationships as the first
+// in different and longer words.
+//
+// Measured before this was fixed: normalizing the corpus deleted 27 such bullets across
+// those 7 skills and left each holding an empty heading, while INDEX.md stayed
+// byte-identical — the graph gained nothing and the documents lost paragraphs.
+func TestNormalizeKeepsARestatementInOtherWords(t *testing.T) {
+	t.Parallel()
+	in := "# Body\n\n## Related Skills\n\n" +
+		"- depends-on: `alpha` — the short reason\n\n" +
+		"______________________________________________________________________\n\n" +
+		"## Related Skills\n\n" +
+		"- **depends_on**: alpha — the longer reason, which is the only place " +
+		"anyone explained why\n\n" +
+		"______________________________________________________________________\n\n" +
+		"## Audit Information\n"
+
+	out, _ := related.Normalize(in)
+	if !strings.Contains(out, "the longer reason, which is the only place anyone explained why") {
+		t.Errorf("a rationale nobody else wrote was deleted:\n%s", out)
+	}
+	if !strings.Contains(out, "the short reason") {
+		t.Errorf("the first rationale was lost:\n%s", out)
+	}
+	// The underscore break is a thematic break, so the second section merges rather than
+	// being emptied where it stands.
+	if got := strings.Count(out, "## Related Skills"); got != 1 {
+		t.Errorf("sections = %d, want the second merged into the first:\n%s", got, out)
+	}
+	if strings.Contains(out, "## Related Skills\n\n\n") {
+		t.Errorf("an emptied section was left behind:\n%s", out)
+	}
+	// The reader still sees one edge: keeping the words does not double the graph.
+	if got := len(related.ParseSection(out)); got != 1 {
+		t.Errorf("edges = %d, want 1:\n%s", got, out)
+	}
+	if again, changed := related.Normalize(out); changed || again != out {
+		t.Errorf("must be idempotent, second pass:\n%s", again)
 	}
 }
