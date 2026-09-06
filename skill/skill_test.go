@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/StevenACoffman/skillet/errs"
 	"github.com/StevenACoffman/skillet/identity"
 	"github.com/StevenACoffman/skillet/skill"
+	"github.com/StevenACoffman/toerr/errors/errcode"
 )
 
 const sampleSkill = "---\nname: my-skill\ndescription: does a thing\ntags: [a, b]\n---\n# Body\n\nHello.\n"
@@ -61,8 +61,8 @@ func TestLoadMissing(t *testing.T) {
 	if err == nil {
 		t.Fatal("want an error loading a dir with no SKILL.md")
 	}
-	if code := errs.ErrorCode(err); code != errs.ENOTFOUND {
-		t.Fatalf("want ENOTFOUND code, got %q (%v)", code, err)
+	if code := errcode.Status(err); code != errcode.StatusNotFound {
+		t.Fatalf("want NotFound status, got %v (%v)", code, err)
 	}
 	if !strings.Contains(err.Error(), "not found") {
 		t.Errorf("error message = %q, want it to mention \"not found\"", err)

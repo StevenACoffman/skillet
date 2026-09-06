@@ -289,6 +289,11 @@ linters:
         # preserved) plus a message and trace frame — a genuine wrap, so wrapcheck
         # should treat it like the built-in .Wrap(/.WithMessage( it already allows.
         - .WrapWithMessage(
+        # toerr's coded-leaf constructor: classifies a *new* leaf error with a status
+        # code, the way &errs.Error{Code,Message} used to before that type was retired
+        # to its only consumer. A leaf has no cause to wrap, so wrapcheck's demand does
+        # not apply — the error originates here.
+        - .WithCode(
 
     # ── depguard ─────────────────────────────────────────────────────────────
     # spec.md: climax uses its own command pattern; no third-party CLI frameworks.

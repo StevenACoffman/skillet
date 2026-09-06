@@ -16,10 +16,11 @@ import (
 
 	"github.com/goccy/go-yaml"
 
-	"github.com/StevenACoffman/skillet/errs"
 	"github.com/StevenACoffman/skillet/frontmatter"
 	"github.com/StevenACoffman/skillet/fsutil"
 	"github.com/StevenACoffman/skillet/identity"
+	toerr "github.com/StevenACoffman/toerr/errors"
+	"github.com/StevenACoffman/toerr/errors/errcode"
 )
 
 // FileName is the required filename inside a skill directory.
@@ -72,9 +73,9 @@ func Load(dir string) (*Skill, error) {
 	b, err := os.ReadFile(p)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, &errs.Error{Code: errs.ENOTFOUND, Message: "skill not found: " + p}
+			return nil, errcode.WithCode(errcode.StatusNotFound, "skill not found: "+p, nil)
 		}
-		return nil, &errs.Error{Op: "skill.Load", Err: err}
+		return nil, toerr.WrapWithMessage(err, "skill.Load")
 	}
 	s := &Skill{Dir: dir, Path: p, Raw: string(b), Bytes: len(b)}
 	s.parse()

@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/StevenACoffman/skillet/errs"
 	"github.com/StevenACoffman/skillet/proof"
+	"github.com/StevenACoffman/toerr/errors/errcode"
 )
 
 // writeFile creates root/rel with content.
@@ -42,8 +42,8 @@ func TestCreateVerifyRoundTrip(t *testing.T) {
 func TestCreateEmptyIsInvalid(t *testing.T) {
 	t.Parallel()
 	_, err := proof.Create(t.TempDir(), "arc", "", nil)
-	if errs.ErrorCode(err) != errs.EINVALID {
-		t.Fatalf("empty path set: code = %q, want EINVALID", errs.ErrorCode(err))
+	if errcode.Status(err) != errcode.StatusInvalidArgument {
+		t.Fatalf("empty path set: status = %v, want InvalidArgument", errcode.Status(err))
 	}
 }
 
@@ -58,8 +58,8 @@ func TestVerifyMissingArtifact(t *testing.T) {
 	if err := os.Remove(filepath.Join(root, "a.txt")); err != nil {
 		t.Fatal(err)
 	}
-	if code := errs.ErrorCode(proof.Verify(root, &pkt)); code != errs.ECONFLICT {
-		t.Fatalf("missing artifact: code = %q, want ECONFLICT", code)
+	if code := errcode.Status(proof.Verify(root, &pkt)); code != errcode.StatusFailedPrecondition {
+		t.Fatalf("missing artifact: status = %v, want FailedPrecondition", code)
 	}
 }
 
@@ -72,8 +72,8 @@ func TestVerifyDigestMismatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeFile(t, root, "a.txt", "TAMPERED") // bytes changed after Create
-	if code := errs.ErrorCode(proof.Verify(root, &pkt)); code != errs.ECONFLICT {
-		t.Fatalf("digest mismatch: code = %q, want ECONFLICT", code)
+	if code := errcode.Status(proof.Verify(root, &pkt)); code != errcode.StatusFailedPrecondition {
+		t.Fatalf("digest mismatch: status = %v, want FailedPrecondition", code)
 	}
 }
 

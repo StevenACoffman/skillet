@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 
 	"github.com/StevenACoffman/skillet/atomicfile"
-	"github.com/StevenACoffman/skillet/errs"
 	"github.com/StevenACoffman/skillet/identity"
 	errors "github.com/StevenACoffman/toerr/errors"
+	"github.com/StevenACoffman/toerr/errors/errcode"
 )
 
 // Artifact is one declared piece of proof: a repository-relative path and the
@@ -46,10 +46,8 @@ type Packet struct {
 func Create(root, arc, gitSHA string, paths []string) (Packet, error) {
 	const op = "proof.Create"
 	if len(paths) == 0 {
-		return Packet{}, &errs.Error{
-			Code:    errs.EINVALID,
-			Message: "proof create requires at least one artifact path",
-		}
+		return Packet{}, errcode.WithCode(errcode.StatusInvalidArgument,
+			"proof create requires at least one artifact path", nil)
 	}
 	artifacts := make([]Artifact, 0, len(paths))
 	for _, path := range paths {
@@ -105,24 +103,22 @@ func Load(path string) (Packet, error) {
 func Verify(root string, pkt *Packet) error {
 	const op = "proof.Verify"
 	if len(pkt.Artifacts) == 0 {
-		return &errs.Error{Code: errs.EINVALID, Message: "proof packet declares no artifacts"}
+		return errcode.WithCode(errcode.StatusInvalidArgument,
+			"proof packet declares no artifacts", nil)
 	}
 	for _, artifact := range pkt.Artifacts {
 		data, err := os.ReadFile(filepath.Join(root, artifact.Path))
 		switch {
 		case os.IsNotExist(err):
-			return &errs.Error{
-				Code:    errs.ECONFLICT,
-				Message: "missing proof artifact: " + artifact.Path,
-			}
+			return errcode.WithCode(errcode.StatusFailedPrecondition,
+				"missing proof artifact: "+artifact.Path, nil)
 		case err != nil:
 			return errors.WrapWithMessage(err, op)
 		}
 		if got := identity.Hash(string(data)); got != artifact.Digest {
-			return &errs.Error{
-				Code:    errs.ECONFLICT,
-				Message: "proof artifact digest mismatch: " + artifact.Path + " has " + got + ", want " + artifact.Digest,
-			}
+			return errcode.WithCode(errcode.StatusFailedPrecondition,
+				"proof artifact digest mismatch: "+artifact.Path+" has "+got+
+					", want "+artifact.Digest, nil)
 		}
 	}
 	return nil

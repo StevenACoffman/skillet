@@ -8,6 +8,28 @@ prompts, and the findings / checks / proofs that certify them.
 Scope boundary: **CLI scaffolding and the machine-output envelope do NOT live here.**
 They belong to `climax` (see that repo's TODO.md). skillet is domain code only.
 
+Checkbox vocabulary. The box stays a GFM tasklist boolean — `[x]` or `[ ]`, nothing else —
+and a `{tag}` after it carries the disposition, because the state that matters here is not
+binary and a non-standard box character stops rendering as a checkbox at all.
+
+| Form                     | Meaning                                                                                   |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `[x]`                    | done, and built                                                                           |
+| `[x] {refused}`          | a standing rule rejects the whole class; it would be rejected again                       |
+| `[x] {closed-unbuilt}`   | one candidate assessed against a bar and failed it; a changed measurement could reopen it |
+| `[x] {overtaken}`        | became moot because something else landed; nothing was built for it                       |
+| `[x] {premise-wrong}`    | the entry's stated premise turned out false — read the correction before trusting it      |
+| `[ ]`                    | actionable now — no tag means nothing is holding it                                       |
+| `[ ] {await-trigger}`    | held on a condition stated in the entry                                                   |
+| `[ ] {blocked}`          | waiting on another item in this backlog                                                   |
+| `[ ] {blocked-external}` | waiting on something no item here will deliver                                            |
+| `[ ] {cross-repo}`       | actionable, but needs coordinated work in another repo                                    |
+| `[ ] {decision-needed}`  | buildable; what is unresolved is a choice                                                 |
+
+Tags compose (`{await-trigger} {blocked}`). An untagged `[ ]` is a claim that the item can
+be picked up today, so tagging is not decoration: `[ ]` alone used to cover both actionable
+and trigger-held work, which made a box count overstate what was open.
+
 ## Preserve Mature Libraries (Hard Constraint)
 
 Where two source repos agree, keep whatever third-party library the originals used to
@@ -400,8 +422,52 @@ not yet tracked elsewhere.
   a struct (`&adh.Error{Op,Err}`, 157 sites) and toerr exposes no composable struct, so `errs.Error` is
   retained as adh's compat type. `errs` now imports toerr directly, so adh gains toerr indirect on its
   next bump — setting up an eventual adh migration off struct-literal `Error` (the remaining follow-up).
-  - [ ] Follow-up (needs an adh-side change + a wrapcheck sig for `errcode.WithCode`): migrate proof's
-    leaf errors to `errcode.WithCode` and adh off `&adh.Error{}` literals, then retire `errs.Error`.
+  - [ ] Follow-up: migrate proof's leaf errors to `errcode.WithCode` and adh off
+    `&adh.Error{}` literals, then retire `errs.Error`.
+    **PARTLY DONE 2026-09-04, and the entry's consumer count was wrong.**
+
+    Done: `proof`'s 4 leaves and `skill`'s 1 leaf now use `errcode.WithCode`; `skill.Load`'s
+    wrapper uses `toerr.WrapWithMessage`, completing *toerr wraps, errcode classifies*;
+    `.WithCode(` is registered with `wrapcheck` beside `.WrapWithMessage(`. **No `errs.Error`
+    literal remains in skillet's own code** — the package is now published for consumers only.
+    adh stopped aliasing it: `internal/adh` defines its own `Error`, which is where the layout
+    this family follows puts an application's error type, and it took **one file** because all
+    203 literals went through the alias.
+
+    **Not done, and it should not be: `errs.Error` stays.** The plan for this was built on
+    "`errs` has one importer" — measured across exegesis, canonizer and skillsaw, all of which
+    pin v0.27.0 and import none of it. **That survey missed `gnosis`, which this repo's own
+    README names in the consumer table: 131 files, 429 `errs.Error{}` literals, 57
+    `errs.ErrorCode` calls.** So the type has two consumers, which is exactly the bar this file
+    uses to decide a type belongs in the library. Deleting it was attempted and reverted.
+
+    **The near-miss is the finding.** Three consumer repos were checked by hand and the fourth
+    was listed in `README.md:23` the whole time. A promote-on-2nd-consumer rule needs a
+    consumer list nothing can silently omit; the README table is that list and nobody read it.
+
+    Compatibility with the proof migration was verified rather than assumed: gnosis never
+    type-asserts `*errs.Error` and never classifies a proof error by code, and `errs.ErrorCode`
+    still bridges `errcode.Status`, so a coded proof error reads back as the same string code.
+
+    Remaining, and now genuinely cross-repo: retiring `errs.Error` means migrating gnosis's 429
+    literals, or gnosis owning its own `Error` as adh now does. That is gnosis's call.
+
+    **gnosis made the call on 2026-09-05 and migrated.** All of its literals now use
+    `toerr.WrapWithMessage` and `errcode.WithCode`, so **no `errs.Error` literal remains in any
+    consumer** and the type can be retired when a release is convenient. gnosis keeps
+    `errs.ErrorCode` — the string vocabulary its machine-output envelope's `reason` tokens are
+    built from — which reads toerr errors natively since the consolidation above.
+
+    **The counts in this entry were close and not right, which is its own lesson recurring.**
+    The tree held **436 literals in 105 files and 53 `ErrorCode` calls**, not 429 in 131 with 57.
+    The near-miss above was a consumer nobody re-measured; this was a measurement nobody re-ran.
+
+    Two findings worth having here rather than only in gnosis. Migrating is right for gnosis and
+    owning an `Error` was right for adh, and the difference is not taste: adh's 203 literals went
+    through an alias, so owning a type cost one file, while gnosis's were direct literals across
+    105 files — the rewrite is the same either way and only the destination differs. And
+    `errs.Error.Error()` prefers `Err` over `Message`, so any site setting both has an
+    unreachable message; gnosis had eight, invisible until the literals became calls.
 - [x] **`skill.Load` → `ENOTFOUND` mapping** DONE (2026-08-05): a missing SKILL.md is translated
   at the boundary to a leaf `errs.Error{Code: ENOTFOUND}` (classify via `errs.ErrorCode`); any other
   read error wraps with `Op: "skill.Load"`. `os.ErrNotExist` is no longer propagated (verified no
@@ -648,7 +714,7 @@ already owns.
   that needs to *act* on a specific rewrite", but only one rewrite admits a different
   action; the other six all mean *converted, carry on*. Waiting for a second is waiting for
   something the vocabulary cannot produce.
-- [ ] Deferred — a possible `skillet/bandit` (Thompson Sampling: Beta-Bernoulli +
+- [ ] {await-trigger} Deferred — a possible `skillet/bandit` (Thompson Sampling: Beta-Bernoulli +
   Marsaglia-Tsang Gamma sampling, plus entropy/convergence diagnostics) if a 2nd consumer
   wants principled strategy selection under uncertainty. unified-thinking's
   `internal/reinforcement` is a clean, seedable, ~90%-covered reference. Only one
@@ -744,7 +810,7 @@ met before the knowledge-base tool exists at all.
   in the canonical form).
   Equality throughout is `textnorm.Fold`-normalized, **not** byte equality — see the
   promotion item below. Case is preserved, per that package's existing decision.
-- [ ] **DEFERRED 2026-08-15 with a trigger: the canonical form has no subject slot.**
+- [ ] {await-trigger} {blocked} **DEFERRED 2026-08-15 with a trigger: the canonical form has no subject slot.**
   Decision: do not build it yet, and do not approximate it. **The value side had never been
   measured, and it measures zero.** The only real corpus is
   `go-advice/Sources/command_rules.md` (24 rules); everything else is a 1-4 rule prompt
@@ -846,7 +912,7 @@ met before the knowledge-base tool exists at all.
   **Caution:** a version field invites use. Reach for v2 when the grammar genuinely changes —
   not to record provenance, tool identity or scoring metadata. That is how a format version
   becomes a second manifest, and `identity.Hash` already pins which bytes produced what.
-- [ ] **Deliberately NOT built: near-duplicate and semantic-similarity detection.** The
+- [x] {refused} **Deliberately NOT built: near-duplicate and semantic-similarity detection.** The
   obvious next detector — "these two rules are 0.87 similar, probably in conflict" —
   requires a threshold nobody has calibrated, over an embedding or an edit distance,
   gating adoption. That is the same defect as unified-thinking's bias detectors and it is
@@ -915,7 +981,7 @@ met before the knowledge-base tool exists at all.
   consumer. Evidence out, policy to the caller — the same boundary `skilllens` draws.
   exegesis's caution carries up: because resolution is environmental, this is a **warning**
   tier and probably opt-in, never a hard gate.
-- [ ] **EVALUATED and NOT promoted 2026-08-17: OKF's trust fields (`generated`/`verified`).**
+- [x] {closed-unbuilt} **EVALUATED and NOT promoted 2026-08-17: OKF's trust fields (`generated`/`verified`).**
   Three repos reference the Open Knowledge Format (`agent-blue/knowledge-catalog/okf/SPEC.md`,
   v0.2, Apache-2.0) and I recommended promoting its trust vocabulary as the strongest
   candidate in the family. **Checking the consumers says otherwise, and that recommendation
@@ -1225,7 +1291,7 @@ work. Three items, each checked against the code here as well as there.
   move** — a small confirmation the naming is right, since canonizer reached it
   independently. No production code breaks either way: exegesis, skillsaw and adh have zero
   `.Category` read sites. Filed in both consumers' backlogs.
-- [ ] **A set hash beside `identity.Hash`.** `identity.Hash` fingerprints one artifact;
+- [ ] {await-trigger} **A set hash beside `identity.Hash`.** `identity.Hash` fingerprints one artifact;
   nothing fingerprints *a collection*. `agent-fuschia/gradecore`'s `suite_hash`
   (`gradecore/freeze.py:20`) is `sha256[:12]` over `"|".join(identities)`, and it exists to
   make "these two implementations agree" a checkable claim rather than an asserted one —
@@ -1885,7 +1951,7 @@ code applies to shared backlogs — one home, and a pointer from everywhere else
 
 ## One Field Declined, from Exegesis's Act-Statement Work (2026-08-23)
 
-- [ ] **`manifest.Manifest` has no field saying which act produced the verdict, and it
+- [ ] {await-trigger} **`manifest.Manifest` has no field saying which act produced the verdict, and it
   should not get one until a second tool can set it.** exegesis landed the human half of
   `vac-protocol` §4 — every `verify` run now ends with *"structural gates only; semantic
   replay not performed"* — and stopped short of the manifest field its own entry proposed,
@@ -2185,7 +2251,7 @@ a cost. Edges live in SKILL.md, so any edge change already moves `Hash` and surf
 `Axes.Skill`; feeding them to `axes` as well would report one change on two axes. The
 control confirms it — wiring edges into `axes` fails `TestEdgesAreRecordedNotDiffed`.
 
-- [ ] **The inert-render property is proven on a fixture, not on the corpus.** The format
+- [ ] {blocked-external} **The inert-render property is proven on a fixture, not on the corpus.** The format
   entry's standard was *"all 29 stored rulesets render byte-identically… proven on the real
   corpus rather than fixtures"*, and no canonical-form ruleset is checked out on this
   machine — 59 files carry `§` lines and none parses as the form. So
@@ -2199,7 +2265,7 @@ control confirms it — wiring edges into `axes` fails `TestEdgesAreRecordedNotD
   that use the section sign, not stored rulesets). Recorded rather than left silent because
   a check nobody can run and a check that passes read the same in a backlog, and only one of
   them means the property holds.
-- [x] **`manifest.Skill.Edges` has no producer and no consumer yet.** OVERTAKEN 2026-08-27,
+- [x] {overtaken} **`manifest.Skill.Edges` has no producer and no consumer yet.** OVERTAKEN 2026-08-27,
   the same day, and the entry's concern was honoured rather than overruled — worth recording
   because the two look alike from the outside.
   skillsaw now has both halves: `inventory.Entry` records the edges off the same
@@ -2430,3 +2496,60 @@ parsing improves.**
       `TestNormalizeReadsTheUnderscoreDialect` likewise — it is about the *reader*, and it
       now says so. `TestNormalizeMergeKeepsEveryEdgeAndTheFirstRationale` became
       `…AndEveryRationale`, because that is what changed.
+
+## `naming.Title` Needs a Canonical-Name Table, and It Is Not a `rumdl` Problem (2026-09-03)
+
+Source: adh's `.rumdl.toml` MD063 mangling lowercase project names in headings (`adh` →
+`Adh`, `v0.20.0` → `V0.20.0`). Tracing whether the same fix belonged here found a second
+title-caser with the same bug and a **different, unlinted output surface**.
+
+`naming.Title` uppercases the first byte of every word in a filename stem, which is right
+for `my-source_file` and wrong for every name that is not an ordinary English word.
+Measured against the function as written:
+
+| Stem                    | `Title` returns         | Wanted                    |
+| ----------------------- | ----------------------- | ------------------------- |
+| `adh-harness`           | `Adh Harness`           | `adh` Harness             |
+| `skilllens-dimensions`  | `Skilllens Dimensions`  | `SkillLens` Dimensions    |
+| `skillet-v0.27.0-notes` | `Skillet V0.27.0 Notes` | `skillet` `v0.27.0` Notes |
+| `2nd-consumer`          | `2nd Consumer`          | unchanged, and it is      |
+
+- [ ] {decision-needed} **`Title` needs a stem → canonical-title table, and `ignore-words`
+      is the wrong shape for it.** `rumdl` MD063 takes an ignore list because it is handed
+      text already spelled right and only has to leave it alone. `Title` is handed a
+      *lowercase stem* and has to produce the spelling, so `SkillLens` is unrecoverable from
+      `skilllens` by any rule that merely skips words — there is no capital to preserve. The
+      table has to carry the answer, not the exemption.
+      **The blast radius differs per call site, and none of it is a markdown heading** —
+      which is where the premise this entry started from turned out to be wrong.
+      `related/graph.go:245` (`label := n.Title`, fed by exegesis
+      `internal/indexgen/indexgen.go:61`, which calls `Title(slug)` unconditionally) puts it
+      in a **Mermaid node label inside a fenced block**, and `rumdl` skips fenced blocks, so
+      MD063 never sees it and never will — the label is simply wrong.
+      `ruleset/synthesize/synthesize.go:52` puts it in a `source=` attribute of a prompt,
+      `<ruleset id="1" source="Adh Harness">`, where **a model reads it**: a
+      plausible-but-wrong project name in a prompt is the worst of the three and the least
+      visible. `ruleset/distill/distill.go:111,115` puts it in markdown **link text**, and
+      again as `title + " Rules"`.
+      **So no linter looks at any of it.** MD063 at least runs in a `fmt` pass a person
+      reviews, and has `ignore-words` if anyone sets it; a Mermaid label, a prompt attribute
+      and a link text are checked by nothing, which is why this went unnoticed while the
+      *heading* case was noticed twice.
+      **Blast radius differs again by call site:** `synthesize` and `distill` prefer
+      `TitleFromMarkdown` and reach `Title(stem)` only when the source file has no H1, while
+      `indexgen` has no fallback and derives from the slug every time.
+      **`Title` is pure, so the change is cheap and the whole question is where the table
+      lives.** The same set of names is wanted by at least three consumers: this function, a
+      `vale` vocabulary that currently flags `adh` as a misspelling, and MD063's
+      `ignore-words` in three **byte-identical** `.rumdl.toml` copies — this repo,
+      `agentic-dev-harness`, and exegesis — that nothing keeps in sync. Adding a fourth
+      private copy inside `naming` is the cheap move and the wrong one.
+
+**Two measurements argue the heading half is already solved here by convention.** MD063
+damage in this repo's own headings is one line: `TODO.md:299` reads `2Nd Consumer: Adh`, and
+`2Nd` is MD063's doing, not `Title`'s, which leaves `2nd` alone — the two tools damage
+different tokens. The reason there is only one is that **9 of this file's headings already
+backtick their identifiers**, and MD063 leaves a code span alone, so a bare lowercase name
+in a heading is the exception here rather than the rule. That argues for writing the
+existing convention down over setting a config key. A repair pass has to come first either
+way, since the file is not `fmt`-clean.
