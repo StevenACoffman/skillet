@@ -135,7 +135,7 @@ func TestDiffPartitionsTheUnion(t *testing.T) {
 		manifest.Skill{Slug: "edit", Dir: "/t/edit", Hash: "h2-changed"},
 		manifest.Skill{Slug: "new", Dir: "/t/new", Hash: "h4"},
 	)
-	d := manifest.Diff(base, cur)
+	d := manifest.Diff(&base, &cur)
 	for _, tc := range []struct {
 		name string
 		got  []string
@@ -164,7 +164,7 @@ func TestDiffMatchesTheSameTreeSpelledDifferently(t *testing.T) {
 	// raw Dir would report every skill as both added and removed.
 	relative := tree(".", manifest.Skill{Slug: "foo", Dir: "foo", Hash: "h1"})
 	absolute := tree("/t", manifest.Skill{Slug: "foo", Dir: "/t/foo", Hash: "h1"})
-	d := manifest.Diff(relative, absolute)
+	d := manifest.Diff(&relative, &absolute)
 	if len(d.Unchanged) != 1 || d.Unchanged[0] != "foo" {
 		t.Errorf("same tree spelled two ways did not match: %+v", d)
 	}
@@ -185,7 +185,7 @@ func TestDiffKeepsCollidingSlugsApart(t *testing.T) {
 		manifest.Skill{Slug: "foo", Dir: ".claude/skills/foo", Hash: "h1"},
 		manifest.Skill{Slug: "foo", Dir: ".cursor/skills/foo", Hash: "h2-edited"},
 	)
-	d := manifest.Diff(base, cur)
+	d := manifest.Diff(&base, &cur)
 	if !reflect.DeepEqual(d.Changed, []string{".cursor/skills/foo"}) {
 		t.Errorf("Changed = %v, want only the edited .cursor copy", d.Changed)
 	}
@@ -207,10 +207,9 @@ func TestDiffTreatsAnUnknownHashAsChanged(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			d := manifest.Diff(
-				tree("/t", manifest.Skill{Slug: "a", Dir: "/t/a", Hash: tc.baseHash}),
-				tree("/t", manifest.Skill{Slug: "a", Dir: "/t/a", Hash: tc.curHash}),
-			)
+			base := tree("/t", manifest.Skill{Slug: "a", Dir: "/t/a", Hash: tc.baseHash})
+			cur := tree("/t", manifest.Skill{Slug: "a", Dir: "/t/a", Hash: tc.curHash})
+			d := manifest.Diff(&base, &cur)
 			wantChanged := tc.baseHash == "" || tc.curHash == ""
 			if got := len(d.Changed) == 1; got != wantChanged {
 				t.Errorf("changed=%t, want %t (base %q, cur %q): %+v",
@@ -229,7 +228,7 @@ func TestDiffDoesNotLetADuplicateLocationHideAChange(t *testing.T) {
 		manifest.Skill{Slug: "a", Dir: "/t/a", Hash: "h2"},
 		manifest.Skill{Slug: "a", Dir: "/t/a", Hash: "h1"},
 	)
-	if d := manifest.Diff(base, cur); !reflect.DeepEqual(d.Changed, []string{"a"}) {
+	if d := manifest.Diff(&base, &cur); !reflect.DeepEqual(d.Changed, []string{"a"}) {
 		t.Errorf("a contradicted location must count as changed, got %+v", d)
 	}
 }
@@ -240,7 +239,8 @@ func TestDiffAgainstAnEmptyBaseReportsEverythingAdded(t *testing.T) {
 		manifest.Skill{Slug: "b", Dir: "/t/b", Hash: "h2"},
 		manifest.Skill{Slug: "a", Dir: "/t/a", Hash: "h1"},
 	)
-	d := manifest.Diff(manifest.Manifest{}, cur)
+	empty := manifest.Manifest{}
+	d := manifest.Diff(&empty, &cur)
 	if !reflect.DeepEqual(d.Added, []string{"a", "b"}) {
 		t.Errorf("Added = %v, want both, sorted", d.Added)
 	}
@@ -255,7 +255,7 @@ func TestDiffOfAManifestWithItselfIsAllUnchanged(t *testing.T) {
 		{Slug: "a", Dir: "/t/a", Hash: "h1"},
 		{Slug: "b", Dir: "/t/b", Hash: "h2"},
 	}, true)
-	d := manifest.Diff(m, m)
+	d := manifest.Diff(&m, &m)
 	if len(d.Stale()) != 0 || len(d.Removed) != 0 || len(d.Unchanged) != 2 {
 		t.Errorf("a manifest must not differ from itself: %+v", d)
 	}
@@ -321,10 +321,9 @@ func TestDiffReportsWhichFileMoved(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			d := manifest.Diff(
-				manifest.Build("t", "tree", []manifest.Skill{tc.base}, true),
-				manifest.Build("t", "tree", []manifest.Skill{tc.cur}, true),
-			)
+			base := manifest.Build("t", "tree", []manifest.Skill{tc.base}, true)
+			cur := manifest.Build("t", "tree", []manifest.Skill{tc.cur}, true)
+			d := manifest.Diff(&base, &cur)
 			if got := len(d.Changed) == 1; got != tc.wantChanged {
 				t.Fatalf("changed = %v, want %v (delta %+v)", got, tc.wantChanged, d)
 			}
@@ -357,7 +356,7 @@ func TestChangedAxesIsKeyedByExactlyChanged(t *testing.T) {
 		skillAt("new", "h1", "p", "p1"),
 	}, true)
 
-	d := manifest.Diff(base, cur)
+	d := manifest.Diff(&base, &cur)
 	if len(d.ChangedAxes) != len(d.Changed) {
 		t.Fatalf("%d axes for %d changed locations", len(d.ChangedAxes), len(d.Changed))
 	}
@@ -391,7 +390,7 @@ func TestEdgesAreRecordedNotDiffed(t *testing.T) {
 	base := withEdges(map[string][]string{"composes-with": {"b"}})
 	cur := withEdges(map[string][]string{"contrasts-with": {"b"}})
 
-	d := manifest.Diff(base, cur)
+	d := manifest.Diff(&base, &cur)
 	if len(d.Changed) != 0 {
 		t.Errorf("an edge change was reported as a content change: %v", d.Changed)
 	}
@@ -504,5 +503,58 @@ func TestEdgesRecordedIsFalseOnAManifestPredatingTheField(t *testing.T) {
 	}
 	if got.EdgesRecorded {
 		t.Error("a manifest with no edges_recorded key read as having recorded them")
+	}
+}
+
+// TestExaminedZeroWithSkillsMeansAnOlderManifest keeps the inference the Examined doc rests
+// on a checked claim rather than a comment.
+//
+// Absent and zero are the same bytes, so "written before the field existed" and "examined
+// nothing" cannot be told apart by the field alone. They are separable from data already
+// present: a producer that examined nothing lists nothing, so a manifest with skills and a
+// zero count can only predate the field. That is what buys a plain int here instead of a
+// *int or a companion bool.
+func TestExaminedZeroWithSkillsMeansAnOlderManifest(t *testing.T) {
+	t.Parallel()
+	older := manifest.Build("exegesis", "/t",
+		[]manifest.Skill{{Slug: "a", Dir: "/t/a", Hash: "h1"}}, true)
+	if older.Examined != 0 {
+		t.Fatalf("Examined = %d; Build must not invent a count it was not given",
+			older.Examined)
+	}
+	if len(older.Skills) == 0 {
+		t.Fatal("the fixture lists no skills, so it cannot demonstrate the inference")
+	}
+
+	// The other side: a producer that examined nothing lists nothing, so the same zero
+	// carries the opposite meaning and the skills list is what separates them.
+	empty := manifest.Build("exegesis", "/t", nil, true)
+	if empty.Examined != 0 || len(empty.Skills) != 0 {
+		t.Errorf("an empty tree: Examined=%d skills=%d, want both zero",
+			empty.Examined, len(empty.Skills))
+	}
+}
+
+// TestExaminedRoundTripsThroughJSON pins that the field reaches a consumer at all, which is
+// the whole point: len(Skills) already carried the number and nothing read it.
+func TestExaminedRoundTripsThroughJSON(t *testing.T) {
+	t.Parallel()
+	m := manifest.Build("exegesis", "/t",
+		[]manifest.Skill{{Slug: "a", Dir: "/t/a", Hash: "h1"}}, true)
+	m.Examined = 7
+
+	b, err := m.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if !strings.Contains(string(b), `"examined": 7`) {
+		t.Errorf("the count is not in the JSON:\n%s", b)
+	}
+	var back manifest.Manifest
+	if err := json.Unmarshal(b, &back); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if back.Examined != 7 {
+		t.Errorf("Examined = %d after a round trip, want 7", back.Examined)
 	}
 }

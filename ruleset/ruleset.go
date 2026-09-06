@@ -13,6 +13,7 @@ import (
 	"github.com/goccy/go-yaml"
 
 	"github.com/StevenACoffman/skillet/frontmatter"
+	"github.com/StevenACoffman/skillet/judge"
 )
 
 // FormatVersion is the canonical-form major version this package writes and is the
@@ -22,11 +23,14 @@ import (
 // or scoring metadata. identity.Hash already pins which bytes produced what, and a format
 // version that accumulates those becomes a second manifest.
 //
-// It is 2. Version 1 was the version reader itself, which changed no grammar; version 2
-// adds the ⚖ warrant marker, which does. A document is only *written* as 2 when it uses
-// that marker -- see formatOf -- so every ruleset written before it still renders
-// byte-identically, which is the property the reader was shipped early to protect.
-const FormatVersion = 2
+// It is 3. Version 1 was the version reader itself, which changed no grammar; version 2
+// adds the ⚖ warrant marker; version 3 adds the Limitations: header and the ⊨ check marker,
+// batched into one bump because each is a grammar change and shipping them apart would
+// migrate every stored ruleset twice. A document is only *written* at a version when it
+// uses something that version introduced -- see formatOf -- so every ruleset written before
+// still renders byte-identically, which is the property the reader was shipped early to
+// protect.
+const FormatVersion = 3
 
 // Severity is how strictly a Rule is enforced.
 const (
@@ -68,12 +72,38 @@ type Rule struct {
 	// Warrant is the ⚖ record of a decision, for a rule no source can anchor. Its zero
 	// value means the rule was never adjudicated, which is the ordinary case.
 	Warrant Warrant
+
+	// Checks are the ⊨ predicates that decide whether this rule fires, and they exist so a
+	// rule can be known-answer tested against its own examples.
+	//
+	// A rule already ships both answers -- Bad is the case it must flag and Good the case
+	// it must not -- and carried no way to run itself against them, so nothing could tell a
+	// rule that discriminates from one that would fire on ordinary work. See Sound, which
+	// is the check these make possible; a rule with no checks is untested rather than
+	// unsound, and that is a different claim.
+	//
+	// Empty for every rule written before version 3, and Render emits nothing for it, so an
+	// existing document is untouched.
+	Checks []judge.Check
 }
 
 // Ruleset is a distilled set of Rules derived from one source.
 type Ruleset struct {
 	Source string
 	Scope  string
+
+	// Limitations is what this ruleset does not cover, and it is the counterpart to Scope
+	// rather than a second phrasing of it.
+	//
+	// A capability statement that will not say what it does not cover is an advertisement:
+	// rules distilled from one book and presented without that book's bounds read as rules
+	// for the whole subject. Scope alone cannot carry this, because a scope naming only what
+	// is included is exactly the shape being objected to.
+	//
+	// Empty is the ordinary case for every ruleset written before version 3, and Render
+	// omits the header entirely when it is empty -- so an existing document is untouched
+	// and does not suddenly declare a version it does not need.
+	Limitations string
 	// Format is the canonical-form major version this ruleset is written in. A file that
 	// declares none is 1, so the zero value reads correctly for every ruleset written before
 	// versioning existed -- unlike finding.Action, whose zero value had to mean "nobody
@@ -157,7 +187,15 @@ func readFormat(md string) (format int, body string, err error) {
 // Ensures: pure. Never below 1, so a Ruleset built in Go without setting Format is a valid
 // v1 document rather than a malformed one, and never above what its content requires, which
 // is what keeps a corpus of warrant-free rulesets rendering byte-identically.
-func formatOf(rs Ruleset) int {
+func formatOf(rs *Ruleset) int {
+	if rs.Limitations != "" {
+		return 3
+	}
+	for i := range rs.Rules {
+		if len(rs.Rules[i].Checks) > 0 {
+			return 3
+		}
+	}
 	for i := range rs.Rules {
 		if rs.Rules[i].Warrant.Present() {
 			return 2
@@ -182,11 +220,16 @@ func renderFormat(format int) string {
 // A Format of 0 renders as version 1, so a Ruleset built in Go without setting it is a
 // valid v1 ruleset rather than a malformed one. Parse returns 1 for an undeclared file, so
 // the two agree on what a version-less ruleset is.
-func Render(rs Ruleset) string {
+func Render(rs *Ruleset) string {
 	var b strings.Builder
 	b.WriteString(renderFormat(formatOf(rs)))
 	fmt.Fprintf(&b, "Source: %s\n", rs.Source)
 	fmt.Fprintf(&b, "Scope:  %s\n", rs.Scope)
+	// Appended after the two headers every document already has, so a ruleset gaining
+	// limitations shows a one-line diff rather than a reordered head.
+	if rs.Limitations != "" {
+		fmt.Fprintf(&b, "Limitations: %s\n", rs.Limitations)
+	}
 	for i := range rs.Rules {
 		r := &rs.Rules[i]
 		b.WriteString("\n")
@@ -206,6 +249,12 @@ func Render(rs Ruleset) string {
 		if r.Warrant.Present() {
 			fmt.Fprintf(&b, "%s⚖  %s %s  %s\n",
 				indent, r.Warrant.By, r.Warrant.At, r.Warrant.Rationale)
+		}
+		// One line per check, in the order given: a rule's checks are a conjunction, and
+		// re-ordering them on render would change the bytes without changing the meaning,
+		// which is what the inert-render property forbids.
+		for _, c := range r.Checks {
+			fmt.Fprintf(&b, "%s⊨  %s  %s\n", indent, c.Op, c.Arg)
 		}
 	}
 	return b.String()
@@ -262,6 +311,8 @@ func applyMeta(rs *Ruleset, line string) bool {
 		rs.Source = strings.TrimSpace(strings.TrimPrefix(line, "Source:"))
 	case strings.HasPrefix(line, "Scope:"):
 		rs.Scope = strings.TrimSpace(strings.TrimPrefix(line, "Scope:"))
+	case strings.HasPrefix(line, "Limitations:"):
+		rs.Limitations = strings.TrimSpace(strings.TrimPrefix(line, "Limitations:"))
 	default:
 		return false
 	}

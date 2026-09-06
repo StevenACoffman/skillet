@@ -37,6 +37,30 @@ type Manifest struct {
 	// reads the graph as unavailable and declines to report, rather than reporting a
 	// silent "no changes" against a baseline it never had.
 	EdgesRecorded bool `json:"edges_recorded,omitempty"`
+
+	// Examined is how many skills the producer looked at.
+	//
+	// StructureVerified answers "did every gate pass" and nothing else, so a tree holding no
+	// skills produced `structure_verified: true` -- vacuously, no gate failed -- and a
+	// consumer gating on that boolean shipped on a verdict about nothing. skillsaw's
+	// `verified` command is exactly that consumer.
+	//
+	// **It buys legibility, not information, and the doc should not pretend otherwise.**
+	// len(Skills) already carries this number, and skillsaw already prints it while gating
+	// on the boolean beside it. The field exists because a reader checking a verdict does
+	// not think to check an array length -- which is how the defect shipped -- not because
+	// the count was unavailable.
+	//
+	// **Absent and zero are the same bytes, and the ambiguity is resolved from data rather
+	// than by a second field.** A producer that examined nothing lists nothing, so
+	// `Examined == 0 && len(Skills) > 0` can only be a manifest written before this existed.
+	// That inference is what buys the plain int over a *int or an ExaminedRecorded
+	// companion, and TestExaminedZeroWithSkillsMeansAnOlderManifest keeps it a checked claim.
+	//
+	// Set by the producer after Build, the way EdgesRecorded is: Build takes what every
+	// manifest has, and a producer that forgets this leaves it zero -- which reads as
+	// "examined nothing" and fails closed, the same direction EdgesRecorded chose.
+	Examined int `json:"examined,omitempty"`
 }
 
 // Skill is one verified skill's entry.
@@ -199,7 +223,7 @@ func Parse(data []byte) (Manifest, error) {
 // a behaviour change: before this, a manifest recorded that a test-prompts file
 // existed and nothing about its content, so the pair could drift apart with every
 // gate passing.
-func Diff(base, cur Manifest) Delta {
+func Diff(base, cur *Manifest) Delta {
 	baseHashes, curHashes := index(base), index(cur)
 	var d Delta
 	for k, bh := range baseHashes {
@@ -232,7 +256,7 @@ func Diff(base, cur Manifest) Delta {
 }
 
 // Marshal renders the manifest as indented JSON with a trailing newline.
-func (m Manifest) Marshal() ([]byte, error) {
+func (m *Manifest) Marshal() ([]byte, error) {
 	b, err := json.MarshalIndent(m, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("marshal manifest: %w", err)
@@ -263,7 +287,7 @@ func (d *Delta) Stale() []string {
 // which Diff already classifies as changed. Last-wins would let a duplicate hide a real
 // change; falling back to "unknown" reuses the rule that already governs a missing hash
 // rather than inventing a second one.
-func index(m Manifest) map[string]hashes {
+func index(m *Manifest) map[string]hashes {
 	out := make(map[string]hashes, len(m.Skills))
 	for _, s := range m.Skills {
 		k := location(m.Tree, s.Dir)

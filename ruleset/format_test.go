@@ -33,7 +33,7 @@ func TestVersionOneRendersNoBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	out := ruleset.Render(rs)
+	out := ruleset.Render(&rs)
 	if strings.Contains(out, "---") {
 		t.Errorf("v1 rendered a version block:\n%s", out)
 	}
@@ -44,7 +44,7 @@ func TestVersionOneRendersNoBlock(t *testing.T) {
 	// has to remember a field that has one sensible value.
 	zero := rs
 	zero.Format = 0
-	if ruleset.Render(zero) != out {
+	if ruleset.Render(&zero) != out {
 		t.Error("Format 0 and Format 1 rendered differently")
 	}
 }
@@ -108,6 +108,7 @@ func TestFormatVersionTracksTheMarkerSet(t *testing.T) {
 	markersAt := map[int]int{
 		1: 3, // ✗ ✓ ↦
 		2: 4, // + ⚖
+		3: 5, // + ⊨ (Limitations: rides the same bump but is a header, not a marker)
 	}
 	want, recorded := markersAt[ruleset.FormatVersion]
 	if !recorded {
@@ -132,7 +133,7 @@ func TestAWarrantFreeRulesetStillRendersNoBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse() = %v", err)
 	}
-	got := ruleset.Render(rs)
+	got := ruleset.Render(&rs)
 	if strings.Contains(got, "format:") {
 		t.Errorf("a warrant-free ruleset declared a version:\n%s", got)
 	}
@@ -156,7 +157,7 @@ func TestARulesetWithAWarrantDeclaresVersionTwo(t *testing.T) {
 	rs.Rules[0].Warrant = ruleset.Warrant{
 		By: "steve@khanacademy.org", At: "2026-08-27", Rationale: "two MUSTs disagreed",
 	}
-	got := ruleset.Render(rs)
+	got := ruleset.Render(&rs)
 	if !strings.HasPrefix(got, "---\nformat: 2\n---\n") {
 		t.Errorf("a ruleset carrying a warrant did not declare version 2:\n%s", got)
 	}
@@ -193,5 +194,56 @@ func TestAHalfRecordedWarrantIsRefused(t *testing.T) {
 				t.Errorf("a half-recorded warrant was accepted:\n%s", doc)
 			}
 		})
+	}
+}
+
+// TestLimitationsRoundTripsAndDeclaresVersionThree is the header's half of the v3 bump: the
+// declared version is derived from what the document uses, so a ruleset stating its limits
+// says so and one that does not is untouched.
+func TestLimitationsRoundTripsAndDeclaresVersionThree(t *testing.T) {
+	t.Parallel()
+	rs, err := ruleset.Parse(v1Doc)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	rs.Limitations = "Go service code only; nothing about concurrency"
+
+	got := ruleset.Render(&rs)
+	if !strings.HasPrefix(got, "---\nformat: 3\n---\n") {
+		t.Errorf("a ruleset stating limitations did not declare version 3:\n%s", got)
+	}
+	if !strings.Contains(got, "Limitations: Go service code only; nothing about concurrency") {
+		t.Errorf("the limitations header is not in the canonical shape:\n%s", got)
+	}
+	// It follows the two headers every document already has, so gaining limitations is a
+	// one-line diff rather than a reordered head.
+	if !strings.Contains(got, "Scope:  x\nLimitations: ") {
+		t.Errorf("the header is not appended after Scope:\n%s", got)
+	}
+
+	back, err := ruleset.Parse(got)
+	if err != nil {
+		t.Fatalf("a document this package wrote does not parse: %v\n%s", err, got)
+	}
+	if back.Limitations != rs.Limitations {
+		t.Errorf("Limitations = %q, want %q", back.Limitations, rs.Limitations)
+	}
+}
+
+// TestALimitationsFreeRulesetIsUntouched is the inert property for this bump. Every ruleset
+// written before v3 must render byte-identically, or the new field manufactures the drift
+// canonizer's canonical-form check exists to detect.
+func TestALimitationsFreeRulesetIsUntouched(t *testing.T) {
+	t.Parallel()
+	rs, err := ruleset.Parse(v1Doc)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	got := ruleset.Render(&rs)
+	if strings.Contains(got, "Limitations:") {
+		t.Errorf("a ruleset with no limitations emitted the header:\n%s", got)
+	}
+	if got != v1Doc {
+		t.Errorf("round-trip is not byte-identical:\n got %q\nwant %q", got, v1Doc)
 	}
 }

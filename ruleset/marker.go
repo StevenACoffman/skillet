@@ -6,6 +6,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/StevenACoffman/skillet/judge"
 )
 
 // warrantDate is the only spelling of At the form accepts. One spelling because two tools
@@ -75,6 +77,17 @@ func markers() []marker {
 				return err
 			}
 			r.Warrant = w
+			return nil
+		}},
+		{"⊨", func(r *Rule, v string) error {
+			c, err := parseCheck(v)
+			if err != nil {
+				return err
+			}
+			// Appended rather than assigned: this is the first marker in the form that
+			// may appear more than once on a rule, because a rule's checks are a
+			// conjunction and one line each is how a list is written here.
+			r.Checks = append(r.Checks, c)
 			return nil
 		}},
 	}
@@ -164,4 +177,34 @@ func cutField(s string) (field, rest string) {
 		return s, ""
 	}
 	return s[:i], strings.TrimLeftFunc(s[i:], unicode.IsSpace)
+}
+
+// parseCheck reads the body of a ⊨ line: an operator, then the rest as its argument.
+//
+// The operator is validated against judge's own vocabulary rather than a list kept here,
+// because a second enumeration is a second thing to keep in step. judge.Op.Valid exists for
+// this: eval's default arm returns *false with a reason*, which is right when scoring an
+// output and wrong as an answer to "is this a real operator" -- a typo would silently become
+// a check that never passes.
+//
+// The argument keeps its internal spacing and is not split further: a regex or a substring
+// may contain runs of spaces, and trimming only the ends is what lets a check say what it
+// means.
+//
+// Requires: v is the text after the marker, already trimmed.
+// Ensures:  err != nil when v names no operator or an operator judge does not evaluate, or
+//
+//	when the argument is missing; it is pure.
+func parseCheck(v string) (judge.Check, error) {
+	op, arg, found := strings.Cut(v, " ")
+	if !found || strings.TrimSpace(arg) == "" {
+		return judge.Check{}, fmt.Errorf(
+			"ruleset: check %q states an operator with no argument", v)
+	}
+	c := judge.Check{Op: judge.Op(op), Arg: strings.TrimSpace(arg)}
+	if !c.Op.Valid() {
+		return judge.Check{}, fmt.Errorf(
+			"ruleset: unknown check operator %q; known operators are %v", op, judge.Ops())
+	}
+	return c, nil
 }

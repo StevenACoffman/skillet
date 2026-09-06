@@ -39,6 +39,37 @@ type Result struct {
 	Why  []string `json:"why"`  // one line per check: pass/fail + reason
 }
 
+// Ops returns every operator this package evaluates, text-matching and objective alike.
+//
+// The set exists as one value because eval's default arm cannot serve as a validity check:
+// an unknown op there evaluates to *false with a reason*, which is the right behaviour when
+// scoring an output and the wrong answer to "is this a real operator". A caller that reads
+// ops from a document -- ruleset does -- needs to refuse a typo at the point it is read,
+// and enumerating the vocabulary in that caller would make it a second definition that can
+// disagree with this one.
+//
+// Ensures: the result holds every Op eval recognises, and is fresh on each call so no
+//
+//	caller can mutate the vocabulary.
+func Ops() []Op {
+	return []Op{
+		OpSectionPresent, OpRegex, OpContains, OpMaxChars, OpMinChars, OpToolCalled,
+		OpBoolean, OpMultipleChoice, OpNumericOOM,
+	}
+}
+
+// Valid reports whether o is an operator this package evaluates.
+//
+// Ensures: false for the zero value, so an unset Op is not mistaken for a usable one.
+func (o Op) Valid() bool {
+	for _, known := range Ops() {
+		if o == known {
+			return true
+		}
+	}
+	return false
+}
+
 // Score evaluates output against checks. It requires at least one check: a judge
 // with no checks is meaningless, so rather than silently returning a perfect
 // score it returns an error (define errors out of existence — the caller must
