@@ -19,7 +19,7 @@ needed it. Until then it stays where it was written.
 | [`exegesis`](https://github.com/StevenACoffman/exegesis)                       | Distills a book into a tree of Agent Skills and gates their structure                | `skill` `markdown` `speclint` `redlines` `neutrality` `skilllens` `quotecheck` `textnorm` `naming` `manifest` `finding` `identity` `frontmatter` `atomicfile` `testprompts` `ruleset/synthesize` |
 | [`skillsaw`](https://github.com/StevenACoffman/skillsaw)                       | Scores, diagnoses, and validates skills against a 9-dimension rubric                 | `skill` `markdown` `speclint` `redlines` `neutrality` `skilllens` `judge` `ratchet` `calibration` `manifest` `finding` `identity` `testprompts`                                                  |
 | [`canonizer`](https://github.com/StevenACoffman/canonizer)                     | Turns source documents into coding rulesets and grades them independently            | `ruleset` `ruleset/conflict` `ruleset/distill` `ruleset/synthesize` `judge` `proof` `markdown` `skilllens` `calibration` `finding` `textnorm`                                                    |
-| [`agentic-dev-harness`](https://github.com/StevenACoffman/agentic-dev-harness) | Five-stage harness for an agent to plan, build, review, and validate its own changes | `proof` `ratchet` `calibration` `stats` `skilllens` `markdown` `identity` `frontmatter` `atomicfile` `errs`                                                                                      |
+| [`agentic-dev-harness`](https://github.com/StevenACoffman/agentic-dev-harness) | Five-stage harness for an agent to plan, build, review, and validate its own changes | `proof` `ratchet` `calibration` `stats` `skilllens` `markdown` `identity` `frontmatter` `atomicfile`                                                                                             |
 | [`gnosis`](https://github.com/StevenACoffman/gnosis)                           | Accretes outside knowledge into a git-backed corpus, gating every claim on evidence  | `finding` `markdown` `frontmatter` `textnorm` `identity` `errs`                                                                                                                                  |
 
 [`steve-skill-market`](https://github.com/StevenACoffman/steve-skill-market) sits one layer
@@ -143,7 +143,7 @@ Each package does one job and depends on little. Take only what you need.
 
 | Package      | Purpose                                                                  |
 | ------------ | ------------------------------------------------------------------------ |
-| `errs`       | Shared error type with machine-readable codes (leaf/wrapper convention). |
+| `errs`       | Error-code vocabulary, and the bridge that reads it off a toerr error.   |
 | `atomicfile` | Atomic file writes: a crash never leaves a half-written file.            |
 | `fsutil`     | Small `fs.FS`-shaped filesystem helpers.                                 |
 

@@ -62,7 +62,7 @@ const (
 //
 //	deterministically for identical input; severity is left unset for the caller
 //	to assign; it is pure.
-func Find(rs ruleset.Ruleset) []finding.Diagnostic {
+func Find(rs *ruleset.Ruleset) []finding.Diagnostic {
 	var ds []finding.Diagnostic
 	ds = append(ds, divergences(rs.Rules)...)
 	ds = append(ds, sectionCollisions(rs.Rules)...)

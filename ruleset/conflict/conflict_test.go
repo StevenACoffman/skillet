@@ -43,7 +43,7 @@ func TestFindDetectsTheThreePredicates(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			got := conflict.Find(ruleset.Ruleset{Rules: tc.rules})
+			got := conflict.Find(&ruleset.Ruleset{Rules: tc.rules})
 			if len(got) == 0 {
 				t.Fatalf("no diagnostic for %s", name)
 			}
@@ -69,7 +69,7 @@ func TestEqualityIsFoldedNotByteEqual(t *testing.T) {
 		rule("§1.1", "Don’t   reuse a closed handle.", "MUST", "CODE"),
 		rule("§2.4", "Don't reuse a closed handle.", "CONSIDER", "CODE"),
 	}}
-	if got := conflict.Find(rs); len(got) == 0 {
+	if got := conflict.Find(&rs); len(got) == 0 {
 		t.Error("a curly apostrophe and a wrapped line hid a severity divergence")
 	}
 }
@@ -82,7 +82,7 @@ func TestAgreeingRulesAreNotConflicts(t *testing.T) {
 		rule("§1.1", "Always close what you open.", "MUST", "CODE"),
 		rule("§2.4", "Always close what you open.", "MUST", "CODE"),
 	}}
-	for _, d := range conflict.Find(rs) {
+	for _, d := range conflict.Find(&rs) {
 		if d.Category != conflict.CategorySectionCollision {
 			t.Errorf("agreeing rules produced %q: %s", d.Category, d.Message)
 		}
@@ -98,7 +98,7 @@ func TestFindAssignsNoSeverity(t *testing.T) {
 		rule("§1.1", "Always close what you open.", "MUST", "CODE"),
 		rule("§2.4", "Always close what you open.", "CONSIDER", "CODE"),
 	}}
-	got := conflict.Find(rs)
+	got := conflict.Find(&rs)
 	if len(got) == 0 {
 		t.Fatal("expected a diagnostic")
 	}
@@ -120,7 +120,7 @@ func TestFindOnEmptyAndSingleRule(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if got := conflict.Find(rs); len(got) != 0 {
+			if got := conflict.Find(&rs); len(got) != 0 {
 				t.Errorf("got %+v, want none", got)
 			}
 		})
@@ -134,7 +134,7 @@ func TestNoScoreAnywhere(t *testing.T) {
 	rs := ruleset.Ruleset{Rules: []ruleset.Rule{
 		rule("§1.1", "A.", "MUST", "CODE"), rule("§2.4", "A.", "CONSIDER", "CODE"),
 	}}
-	for _, d := range conflict.Find(rs) {
+	for _, d := range conflict.Find(&rs) {
 		if strings.ContainsAny(d.Message, "%") {
 			t.Errorf("message reads like a score: %q", d.Message)
 		}

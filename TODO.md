@@ -422,7 +422,7 @@ not yet tracked elsewhere.
   a struct (`&adh.Error{Op,Err}`, 157 sites) and toerr exposes no composable struct, so `errs.Error` is
   retained as adh's compat type. `errs` now imports toerr directly, so adh gains toerr indirect on its
   next bump — setting up an eventual adh migration off struct-literal `Error` (the remaining follow-up).
-  - [ ] Follow-up: migrate proof's leaf errors to `errcode.WithCode` and adh off
+  - [x] Follow-up: migrate proof's leaf errors to `errcode.WithCode` and adh off
     `&adh.Error{}` literals, then retire `errs.Error`.
     **PARTLY DONE 2026-09-04, and the entry's consumer count was wrong.**
 
@@ -468,6 +468,54 @@ not yet tracked elsewhere.
     105 files — the rewrite is the same either way and only the destination differs. And
     `errs.Error.Error()` prefers `Err` over `Message`, so any site setting both has an
     unreachable message; gnosis had eight, invisible until the literals became calls.
+
+    **DONE 2026-09-06: `errs.Error` is deleted, and this time the survey was run with a
+    compiler.** The condition this waited on was a consumer still composing the struct.
+    None was:
+
+    | Consumer | `errs.Error{}` | any `errs.` use | skillet |
+    | -------- | -------------- | --------------- | ------- |
+    | exegesis | 0 | 0 — no import at all | v0.28.0 |
+    | skillsaw | 0 | 0 — no import at all | v0.28.0 |
+    | canonizer | 0 | 0 | v0.28.0 |
+    | agentic-dev-harness | 0 | 0 — one *comment* recording that it stopped | v0.28.0 |
+    | gnosis | 0 | `ErrorCode` + the five codes | v0.28.0 |
+    | skillet | 0 in production; 10 in `errs/errs_test.go` | — | — |
+
+    **The grep was not treated as the evidence, which is this entry's own lesson applied
+    to itself.** Twice now a consumer survey has been wrong — once by missing a repo, once
+    by not re-measuring counts — so all five were built *and tested* against the local
+    module with a `replace`, and all five passed before anything was deleted. A textual
+    search cannot see a dot-import or a local alias; a compiler can.
+
+    Every consumer was already on v0.28.0, so one release carries this to all of them and
+    there is no skew to sequence around. The ten remaining literals were the type's own
+    tests and left with it.
+
+    **What `errs` is now: five constants and a translation.** `ErrorCode` and
+    `ErrorMessage` map toerr's eleven-value status enum onto skillet's five
+    classifications, which is a translation rather than a forwarding — the arms are
+    many-to-one, and collapsing `AlreadyExists`/`FailedPrecondition` and
+    `Unauthenticated`/`PermissionDenied` is the content. gnosis reads all of it; its
+    machine-output envelope's `reason` tokens are these five strings.
+
+    **The package doc was rewritten rather than trimmed.** It opened on "one Error type…
+    following Ben Johnson's leaf/wrapper convention" and closed on "Error stays a plain
+    struct because a consumer (adh) composes it directly" — a design that had ended and a
+    consumer that had stopped. A doc comment outliving what it documents reads as current,
+    which is worse than none.
+
+    **Breaking, and it breaks nothing that exists.** No consumer composes the struct;
+    `ErrorCode`/`ErrorMessage` keep their signatures and their answers for every input any
+    consumer still produces. A consumer holding a `*errs.Error` would stop compiling —
+    which is the intent, and why the measurement above mattered more than the deletion.
+
+    **One correction fell out of it: `README.md`'s consumer table was stale for adh**,
+    still listing `errs` under "Uses from skillet". That table is the list this entry
+    appointed as authoritative — *"a promote-on-2nd-consumer rule needs a consumer list
+    nothing can silently omit"* — and a list that decides promotions while being wrong in
+    a row is the same failure with the arrow reversed: last time it under-listed a
+    consumer, this time it over-listed one. Corrected in the same change.
 - [x] **`skill.Load` → `ENOTFOUND` mapping** DONE (2026-08-05): a missing SKILL.md is translated
   at the boundary to a leaf `errs.Error{Code: ENOTFOUND}` (classify via `errs.ErrorCode`); any other
   read error wraps with `Op: "skill.Load"`. `os.ErrNotExist` is no longer propagated (verified no
@@ -2553,3 +2601,135 @@ backtick their identifiers**, and MD063 leaves a code span alone, so a bare lowe
 in a heading is the exception here rather than the rule. That argues for writing the
 existing convention down over setting a config key. A repair pass has to come first either
 way, since the file is not `fmt`-clean.
+
+## The Manifest Cannot Say How Much It Examined (2026-09-06)
+
+Source: exegesis found that `verify` writes `structure_verified=true` for a tree holding no
+skills, then verified the same shape in `normalize --check` and fixed that one. The decision
+below was taken by the maintainer on 2026-09-06; the exegesis-local half (exit non-zero) is
+independent and ships there.
+
+- [x] **`manifest.Manifest` records a verdict but not how much was examined, so a tree with
+  no skills is indistinguishable from a tree that passed.** DONE 2026-09-06 as
+  `Manifest.Examined`, producer-set after `Build` the way `EdgesRecorded` is, so no caller's
+  `Build` call changed.
+  **The absent-versus-zero ambiguity is resolved from data rather than by a second field.** A
+  producer that examined nothing lists nothing, so `Examined == 0 && len(Skills) > 0` can
+  only be a manifest written before the field — which buys a plain `int` over a `*int` or an
+  `ExaminedRecorded` companion. `TestExaminedZeroWithSkillsMeansAnOlderManifest` keeps that
+  inference a checked claim rather than a comment.
+  **Adding 8 bytes pushed `Manifest` over gocritic's `hugeParam` threshold**, so `Diff`,
+  `Marshal` and `index` now take pointers. `Diff`'s exported signature changed: downstream
+  call sites (`exegesis/cmd/manifest_hash_test.go`, `skillsaw/cmd/changed`,
+  `skillsaw/internal/edit/coupling.go`) need `&` on the bump. Recorded because it is the
+  cost of the field, and this file's own note that *"pointer to satisfy `hugeParam` broke
+  nothing"* is now true a second time. Original entry:
+  no skills is indistinguishable from a tree that passed.**
+
+  ```console
+  $ exegesis verify <empty-dir>
+  wrote .../skills-manifest.json (structure_verified=true)
+  ```
+
+  Vacuously true — no gate failed — and it is the claim this family spends its effort
+  refusing everywhere else: `finding.Unexamined`, `quotecheck.Status.Unchecked`,
+  `timeseries.Verdict.Compared` and `EdgesRecorded` all exist so that *nobody looked* cannot
+  read as *this is fine*. `Manifest` is the one place it still can.
+  **Decided: carry a count of skills examined.** Not `structure_verified=false`, which would
+  overload one value with *gates failed* and *no gates ran*; not a second boolean, which
+  answers "did we look" without answering "at how much".
+  **Two things the implementer needs, both measured rather than assumed.**
+  **The schema is not versioned.** `Manifest` is `{tool, tree, structure_verified, skills,
+  edges_recorded}` with no version field, so an additive count needs no bump — and the
+  precedent for an additive field here is `EdgesRecorded`, whose absence has a documented
+  fail-closed reading instead of a version to test. Whether this type *should* become
+  versioned is worth deciding on its own; three additive fields have now landed without one,
+  and the fourth is the point at which "we keep not needing it" stops being evidence.
+  **`len(Skills)` already carries the count implicitly, and `skillsaw verified` already
+  prints it** — `skills=%d` at `cmd/verified/verified.go:67` — while gating only on
+  `structure_verified`. So the explicit field buys **legibility, not information**: a
+  consumer reading a boolean does not think to check an array length, which is exactly how
+  this shipped. That is a real justification and a weaker one than "the data is missing", and
+  the entry should not pretend otherwise. If the field does not earn its place, the fallback
+  is that skillsaw gates on `len(Skills)` with no kernel change at all.
+  **This is not the field declined in *One Field Declined, from Exegesis's Act-Statement
+  Work*, and the distinction is the reason that one was declined.** `semantic_verification`
+  was refused because for exegesis it is a **constant** — one tool, one possible value, the
+  `provenance` mistake again. A count is not constant: it differs per run and per tree, and
+  the case that motivates it is the run where it is zero.
+  **Ships with the pending batch**, alongside the `Limitations:` ruleset header and per-rule
+  `checks`, two of which bump `FormatVersion` regardless. Doing them together is one
+  migration of the stored artifacts rather than three.
+  Consumers: `exegesis verify` (producer), `skillsaw verified` (the gate that currently
+  passes on an empty tree).
+
+## Two Ruleset Grammar Additions Canonizer Is Blocked on (2026-09-06)
+
+Both were established in canonizer as *blocked on skillet* and recorded only there, so this
+repository's backlog did not know they were coming — which matters because both bump
+`FormatVersion` and doing them apart means migrating the stored rulesets twice. Filed here
+2026-09-06 after an audit found the batch existed as a cross-repo intention and a single
+forward reference in the entry above.
+
+- [x] **`Ruleset` has no `Limitations:` header, so a distilled ruleset cannot state what it
+  does not cover.** DONE 2026-09-06 as `Ruleset.Limitations`, parsed by `applyMeta`, rendered
+  **after** `Source:` and `Scope:` so a document gaining limits shows a one-line diff rather
+  than a reordered head, and omitted entirely when empty so every existing ruleset renders
+  byte-identically.
+  The asymmetry this entry flagged is unchanged and still worth its own entry: an unknown
+  *marker* is an error, an unknown *header* is silently dropped. Original entry: VAC makes `claim.limitations` REQUIRED and non-empty on the grounds that
+  *"a capability statement that will not say what it does not cover is an advertisement"*. A
+  ruleset distilled from one book and presented without that book's bounds reads as rules for
+  the whole subject.
+  **canonizer shipped the check it could and it is the wrong half.** `verify.Limitations`
+  asks whether the `Scope:` line names an exclusion, using a word list, advisory — because
+  the header VAC wants cannot exist yet. Measured 2026-09-05: a `Limitations:` line parses
+  without error, is **dropped by `Render`**, and the file then fails canonizer's blocking
+  canonical-form check. So today the header is not merely unsupported, it is actively
+  punished.
+  **Note the asymmetry with markers while implementing.** An unrecognised body marker is an
+  *error* (`applyBody`), but `applyMeta` returns false for an unknown header and Parse moves
+  on, so a header from a newer format is dropped in silence. That is the weaker failure mode
+  and it is the one this key would land in. Whether unknown headers should be refused the way
+  unknown markers are is a separate question worth its own entry; it is not this change, and
+  old files carrying stray headers would break.
+  Consumer: canonizer's `verify.Limitations`, which becomes a check on a real field and can
+  then be argued up from advisory to blocking on its own timetable.
+- [x] **`Rule` carries no executable predicate, so no rule can be known-answer tested.**
+  DONE 2026-09-06 as `Rule.Checks []judge.Check`, the `⊨` marker, and `ruleset.Sound`.
+  **The known-answer assertion is deliberately *not* run by `Parse`, which corrected the
+  plan.** Evaluating predicates while reading a document would make a content defect present
+  as an *unparseable file* — a rule whose regex is valid but whose example stopped matching
+  would make the whole ruleset unreadable, and unreadable by the tools that would report it.
+  `Parse` reads bytes, `Sound` judges content, a caller runs both; gnosis's "at load, not in
+  a test" survives in the sense that matters, as a callable check on the artifact.
+  **An unknown operator *is* refused at parse**, because that is a grammar fault and a typo
+  would otherwise become a check that silently never passes. It required `judge.Ops()` and
+  `Op.Valid()`: `eval`'s default arm returns *false with a reason*, which is right for
+  scoring an output and wrong as an answer to "is this a real operator", and enumerating the
+  vocabulary inside `ruleset` would have made a second definition.
+  `⊨` is the first marker in the form that **appends** rather than assigns, since a rule's
+  checks are a conjunction written one per line.
+  A rule with no checks is **untested, not unsound**, and `Sound` does not report it — that
+  is a different claim and belongs to whatever gate decides rules must carry checks.
+  Original entry:
+  gnosis validates its §9.3 pattern table at load — every pattern must match its positive
+  example and must not match its negative one — and it caught a pattern whose own example did
+  not match on the first run. canonizer has the same control at the *gate* (`gate.SelfTest`'s
+  planted defect) and nothing at the *rule*: `SelfTest` proves the gate discriminates and says
+  nothing about whether any individual rule does.
+  **`Rule` already ships both examples.** `Bad` is the ✗ that must be flagged and `Good` is
+  the ✓ that must not be; what is missing is the predicate to run against them. `judge` has
+  the operators (`OpRegex`, `OpContains`, …) and imports only the standard library, so
+  `ruleset` may import it without a cycle.
+  **A cheap proxy was measured and rejected in canonizer, and the reason belongs here so it
+  is not re-proposed.** `verify.Executable` checks one direction — the ✓ does not appear
+  inside the ✗ — and the converse looks free. It is wrong: `✗ conn.Close()` with
+  `✓ defer conn.Close()` has the ✓ containing the ✗, which is the commonest shape a fix
+  takes. Flagging it would fire on correct rules, which is the false-alarm failure the
+  soundness argument is *about*: a rule that fires on ordinary work gets the tool switched
+  off.
+  **Soundness before completeness**, as the source entry has it: trust is more sensitive to
+  false alarms than to misses, and the negative case is the one an author will not write
+  unprompted — so the form should make it impossible to record one example without the other.
+  Consumer: canonizer's per-rule soundness gate.

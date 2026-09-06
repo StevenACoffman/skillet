@@ -49,7 +49,7 @@ func TestRenderParseRoundTrip(t *testing.T) {
 	// is what this is, and leaving Format at 0 would make the round-trip compare a resolved
 	// value against an unset one.
 	rs.Format = 1
-	got, err := ruleset.Parse(ruleset.Render(rs))
+	got, err := ruleset.Parse(ruleset.Render(&rs))
 	if err != nil {
 		t.Fatalf("Parse(Render(rs)): %v", err)
 	}
@@ -63,8 +63,8 @@ func TestRenderDeterministic(t *testing.T) {
 	rs := ruleset.Ruleset{Source: "s", Scope: "sc", Rules: []ruleset.Rule{
 		{Section: "1.1", Severity: ruleset.MUST, Level: ruleset.CODE, Statement: "do X"},
 	}}
-	first := ruleset.Render(rs)
-	if again := ruleset.Render(rs); first != again {
+	first := ruleset.Render(&rs)
+	if again := ruleset.Render(&rs); first != again {
 		t.Error("Render must be deterministic")
 	}
 }
