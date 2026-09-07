@@ -70,7 +70,10 @@ func TestGenerate(t *testing.T) {
 	}
 
 	dialPrompt := readFile(t, filepath.Join(out, "wtf-dial_prompt.md"))
-	if !strings.Contains(dialPrompt, "[Wtf Dial](") { // title derived from the stem
+	// Lower case: the stem-derived title goes through naming.Title, which stopped guessing
+	// capitalization on 2026-09-07. The crud case above keeps its authored casing because it
+	// comes from the file's H1 -- the two assertions together are the distinction.
+	if !strings.Contains(dialPrompt, "[wtf dial](") { // title derived from the stem
 		t.Errorf("dial prompt missing stem-derived title:\n%s", dialPrompt)
 	}
 }

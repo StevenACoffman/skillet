@@ -30,6 +30,13 @@ Tags compose (`{await-trigger} {blocked}`). An untagged `[ ]` is a claim that th
 be picked up today, so tagging is not decoration: `[ ]` alone used to cover both actionable
 and trigger-held work, which made a box count overstate what was open.
 
+**`{await-trigger}` and `{blocked-external}` also want a hold in `holds.toml`**, because
+those two mark a condition external to the item, and a condition with no observer is what
+that file exists to prevent. The other three do not: `{blocked}` points at another item
+here, `{cross-repo}` names who does the work, and `{decision-needed}` has nothing that can
+fire. Nothing checks the correspondence mechanically — see the reasoning in that file's
+header.
+
 ## Preserve Mature Libraries (Hard Constraint)
 
 Where two source repos agree, keep whatever third-party library the originals used to
@@ -858,7 +865,7 @@ met before the knowledge-base tool exists at all.
   in the canonical form).
   Equality throughout is `textnorm.Fold`-normalized, **not** byte equality — see the
   promotion item below. Case is preserved, per that package's existing decision.
-- [ ] {await-trigger} {blocked} **DEFERRED 2026-08-15 with a trigger: the canonical form has no subject slot.**
+- [ ] {await-trigger} **DEFERRED 2026-08-15 with a trigger: the canonical form has no subject slot.**
   Decision: do not build it yet, and do not approximate it. **The value side had never been
   measured, and it measures zero.** The only real corpus is
   `go-advice/Sources/command_rules.md` (24 rules); everything else is a 1-4 rule prompt
@@ -871,8 +878,17 @@ met before the knowledge-base tool exists at all.
   here it cannot fire at all. The rule class is real, the corpus for it is not, and a
   feature whose only exercise is its own tests is how `provenance` ended up flagged for
   deletion with zero consumers.
-  **It is also blocked on the format item below**, which is owed by the first new marker
-  whatever it is, and which is cheap now and dearer with every ruleset written.
+  ~~**It is also blocked on the format item below**, which is owed by the first new marker
+  whatever it is, and which is cheap now and dearer with every ruleset written.~~
+  **That blocker lifted on 2026-08-16 and this entry did not notice for three weeks.** The
+  version reader shipped then (recorded further down this file), and two markers have been
+  added on top of it since — `⚖` in format 2, `⊨` in format 3. So the only thing still
+  holding this item is its own trigger: a ruleset whose rules constrain named quantities.
+  The `{blocked}` tag was removed 2026-09-07.
+  **It was added on 2026-09-04, nineteen days after the blocker was gone**, by someone
+  writing the tag vocabulary meant to make exactly this visible. A tag is a claim about the
+  present, and copying one out of an entry's prose inherits whatever that prose last knew —
+  which is the same failure the `adjudication-artifact` hold made one file over.
   Original entry:
   **Prerequisite, not a shortcut: the canonical form has no subject slot.** The
   conflicts worth the most — two `MUST` rules constraining the same named quantity to
@@ -1029,7 +1045,34 @@ met before the knowledge-base tool exists at all.
   consumer. Evidence out, policy to the caller — the same boundary `skilllens` draws.
   exegesis's caution carries up: because resolution is environmental, this is a **warning**
   tier and probably opt-in, never a hard gate.
-- [x] {closed-unbuilt} **EVALUATED and NOT promoted 2026-08-17: OKF's trust fields (`generated`/`verified`).**
+- [x] **OKF's trust fields — the record is promoted, the fold is not (2026-09-07).**
+  **The replacement trigger fired, and it was invisible because the hold was `manual`.** It
+  read *"the second repo that classifies an actor or derives a trust tier"*. Both exist:
+  gnosis's `FoldTrust` derives a tier from a `verified` actor list
+  (`internal/gnosis/trust.go:87`), and adh's `contextstore.Trust.Tier()` folds `[]Verification`
+  through `actorClass`. gnosis's file was **untracked** when the hold was written, which is
+  why it did not count then; `git ls-files` carries it now.
+  **The two agree on the record and differ on the fold, and that is what decided the shape.**
+  Both repos independently hand-wrote a type *literally named* `Verification` with fields
+  `By string` and `At string`, held as a list — `bundle.Verification` in gnosis
+  (`internal/bundle/bundle.go:187`) and `contextstore.Verification` in adh. Two identical
+  definitions is the duplication this module exists to end. The folds are a different matter:
+  gnosis's actor enum is deliberately closed to three kinds because SPEC §10.6.4 counts
+  distinct humans, while adh's classifier answers human-or-machine for a context-unit tier.
+  **Promoting the fold would make one of them wrong**, so it stays local in both.
+  **The decode-only objection recorded below stands, and this promotion is deliberately
+  smaller than the thing it objects to.** That argument is about a `Generated`/`Verified`
+  struct for the *frontmatter block*: YAML cannot round-trip, gnosis re-emits its block
+  verbatim, so a block struct would be useless on the write path. The **element** is not the
+  block. adh's copy lives in its own JSON store with `json:"by"` tags and round-trips fine;
+  gnosis only ever reads the list to fold it. So the shared element is read/write for one
+  consumer and decode-only for the other, and **the value claimed is ending two identical
+  definitions, not providing an encoder.** Anyone reopening this should read that objection
+  first — it is still the strongest thing written here, and it is why the block is not
+  promoted.
+  **Against `provenance`:** that precedent is a type with **zero** importers. This one has
+  two before it is written, which is the bar this file uses.
+  Original entry: **EVALUATED and NOT promoted 2026-08-17: OKF's trust fields (`generated`/`verified`).**
   Three repos reference the Open Knowledge Format (`agent-blue/knowledge-catalog/okf/SPEC.md`,
   v0.2, Apache-2.0) and I recommended promoting its trust vocabulary as the strongest
   candidate in the family. **Checking the consumers says otherwise, and that recommendation
@@ -1140,7 +1183,18 @@ met before the knowledge-base tool exists at all.
     adoption is incremental by specification.
   When it does land it belongs **in the one consumer that needs it** until a second appears,
   exactly as `quotecheck` stayed in exegesis.
-- [x] **Adjudication is a distinct artifact from detection.** DONE 2026-08-27 — see the entry below. Original entry: When two
+- [x] **Adjudication is a distinct artifact from detection.** DONE 2026-08-27 — see the entry below.
+  **Resolved in "The Warrant, the Shared Rule, and Manifest Edges" further down this file,
+  and the `adjudication-artifact` hold is retired (2026-09-06).** The blocker this entry
+  names — a per-rule warrant needing the format version to ship first — went: the version
+  reader is format 1, the `⚖` marker is format 2, and `ruleset.Rule.Warrant{By, At,
+  Rationale}` shipped in v0.29.0 with `Valid` requiring `By` and `Rationale`, which is the
+  shape this entry specified down to *"and nothing else"*.
+  **The hold outlived its condition by ten days, and the reason is a locator.** It pointed
+  here, where the question is asked, while the answer was written 1100 lines below — so
+  following `where` landed a reader on the held entry with no sign it had been settled. A
+  forward pointer at the moment of resolution is what was missing, which is why this one
+  now exists. Original entry: When two
   rules conflict and a human picks one, the decision is knowledge present in neither source
   — so it can carry no `↦` anchor and **fails `verify.Provenance` by construction.** That
   is the highest-value thing the team produces and the corpus has nowhere to put it. Shape,
@@ -2299,7 +2353,17 @@ a cost. Edges live in SKILL.md, so any edge change already moves `Hash` and surf
 `Axes.Skill`; feeding them to `axes` as well would report one change on two axes. The
 control confirms it — wiring edges into `axes` fails `TestEdgesAreRecordedNotDiffed`.
 
-- [ ] {blocked-external} **The inert-render property is proven on a fixture, not on the corpus.** The format
+- [ ] {blocked-external} **The inert-render property is proven on a fixture, not on the corpus.**
+  **Re-measured 2026-09-06 against format 3 and the entry still stands, with a trap the
+  earlier runs did not surface.** Over five trees: **93 candidates carrying a `§` line, 23
+  returning no error from `ruleset.Parse`, and 0 of those carrying a single rule.** The 23
+  are prose — `PLAN.md`, `SPEC.md`, this file — which `Parse` tolerates as a degenerate
+  empty format-1 ruleset. **A count of "parses" would therefore report 23 and read as
+  satisfied while the honest answer is 0**, which is why the `inert-render-corpus` hold is
+  `manual` rather than a pattern. Format 3 was never going to change this: it adds a
+  `Limitations:` header and the `⊨` marker, while what disqualifies these files is the
+  absence of `Source:`/`Scope:` and of a well-formed `§x.y  [SEV][LEVEL]` rule. The
+  candidate count grew from 66; what it measures did not. Original entry: The format
   entry's standard was *"all 29 stored rulesets render byte-identically… proven on the real
   corpus rather than fixtures"*, and no canonical-form ruleset is checked out on this
   machine — 59 files carry `§` lines and none parses as the form. So
@@ -2562,7 +2626,47 @@ Measured against the function as written:
 | `skillet-v0.27.0-notes` | `Skillet V0.27.0 Notes` | `skillet` `v0.27.0` Notes |
 | `2nd-consumer`          | `2nd Consumer`          | unchanged, and it is      |
 
-- [ ] {decision-needed} **`Title` needs a stem → canonical-title table, and `ignore-words`
+- [x] {refused} **`Title` needs a stem → canonical-title table, and `ignore-words` is the
+      wrong shape for it.** **DECIDED 2026-09-07: no table, and no shared vocabulary. Stop
+      inventing capitalization instead.**
+      **The corpus refutes the framing.** Over **342 distinct slugs**, `Title` mis-cases
+      **78 (22%)** — but **76 of those are acronym tokens** (`cli`, `slo`, `sre`, `ddd`,
+      `api`, `graphql`), and **3 are family names** (`climax`, `climax-cli-scaffold`,
+      `skillsaw-skill`). This entry is filed as a project-name problem and the corpus says
+      acronyms outnumber project names **25:1**. A table would need ~78 entries on day one
+      and one more per skill added, which is not a vocabulary but a second corpus.
+      **And there is nothing to be faithful to.** `skill.Skill` carries a frontmatter `Name`
+      and **273 of 288 skills declare it — as the slug itself**, lowercase and hyphenated.
+      No authored display title exists anywhere in the family, so a table would be inventing
+      spellings that live nowhere else and that nobody could check.
+      **So `Title` should stop producing a spelling it cannot know.** Replace separators and
+      leave case alone: `composite-slo` → `composite slo`. Its three call sites are a Mermaid
+      node label, a `source=` attribute in a prompt, and markdown link text — none is a
+      heading, none is read by `rumdl`, and plain lowercase is acceptable in all three. It is
+      also *more* honest at `indexgen`, which derives from the slug and now shows it. The
+      cost is ordinary words: `my-source_file` becomes `my source file`. That is the trade,
+      taken deliberately, and it is the only option whose maintenance cost is zero and whose
+      failure mode is "plain" rather than "wrong".
+      **The three consumers were never one vocabulary.** `rumdl` wants an *exemption*
+      (`ignore-words`, which exists), `vale` wants a *spelling list* (`accept.txt`, which
+      exists in no repo), and `Title` wants a *mapping*. Only the third needs answers.
+      Merging them because their membership overlaps is the duplicate-classification mistake
+      this module refused with `FixClass` versus `Action` and by reusing `adh.FindingKind`.
+      Each keeps its own list; there is no shared owner and no generator.
+      **The `.rumdl.toml` duplication is real and is not this item's to fix: six
+      byte-identical copies** — skillet, exegesis, skillsaw, canonizer, adh, invigilator —
+      with **gnosis deliberately different**, having disabled MD063 outright after measuring
+      that it counts a §-number as the first word and *"asks for `Is Gnosis's` where the
+      tool's name is deliberately lower-case"*. Two answers in one family is the correct
+      outcome of a per-consumer decision, not drift.
+      **What would overturn this:** somebody wanting a genuine *display* title for skills.
+      That is an authored field on the skill, not a derived table in a library, and it should
+      be filed as that rather than reopening this.
+      **Owed, and small: make `Title` stop inventing capitalization** — separators to
+      spaces, case untouched, and a doc comment saying why a stem cannot yield a spelling.
+      Three call sites move with it and none needs a signature change. Filed as its own item
+      below rather than as a nested bullet, which this file does not use.
+      Original entry: **`Title` needs a stem → canonical-title table, and `ignore-words`
       is the wrong shape for it.** `rumdl` MD063 takes an ignore list because it is handed
       text already spelled right and only has to leave it alone. `Title` is handed a
       *lowercase stem* and has to produce the spelling, so `SkillLens` is unrecoverable from
@@ -2592,6 +2696,66 @@ Measured against the function as written:
       `ignore-words` in three **byte-identical** `.rumdl.toml` copies — this repo,
       `agentic-dev-harness`, and exegesis — that nothing keeps in sync. Adding a fourth
       private copy inside `naming` is the cheap move and the wrong one.
+
+- [x] **Promote the verification record: `Verification{By, At}`, list-valued.** DONE
+  2026-09-07 as **`skillet/verification`** with one type, `Event{By, At}`.
+  **Named `Event`, not `Verification`, and the package is not called `trust`.** The first
+  avoids the stutter; the second is deliberate — all three repos call the area "trust"
+  (`gnosis/trust.go`, `bundle/trust.go`, `contextstore/trust.go`), and a package with that
+  name invites the fold this decision refused. Naming it for the record makes the absence
+  legible. `Event` is also OKF's own word for it.
+  **A one-type package is the house pattern, measured rather than assumed:** `identity` is
+  21 lines with one exported symbol and `frontmatter` is 55 with one function.
+  **The doc carries the union of what both copies already knew**, which is the value of
+  promoting: `By` stays a raw string because gnosis's fold reads the raw form deliberately
+  (§14.1.1 makes raw and parsed two populations); `At` stays a string because **parsing it
+  would make a malformed date drop a verification silently**; and events are stored rather
+  than the tier they imply because a tier cannot name which human, on what date, or
+  represent "reviewed by a person *and* re-confirmed by a nightly process".
+  **No tag conflict, verified before writing it:** adh needs `json:"by"`/`json:"at,omitempty"`
+  and gnosis builds the struct by hand from a map, so it ignores tags entirely.
+  **One test, and it pins the `omitempty` asymmetry** rather than the fields — the fields are
+  the compiler's job, while the asymmetry came from adh's persisted format and is exactly
+  what a tidy-up would flatten, changing bytes already on disk.
+  **It ships with zero importers and the package doc says so**, naming the two consumers
+  waiting and their sequencing entries, so a reader can tell a type awaiting a release from
+  `skillet/provenance`, which had nobody waiting when v0.20.0 deleted it. Original entry: The
+  2026-09-07 decision above, as work. One type, no fold, no `Generated`/`Verified` block.
+  Its two consumers already have byte-identical definitions to delete — `bundle.Verification`
+  in gnosis and `contextstore.Verification` in adh — and each keeps its own tier derivation.
+  Package siting is open: `skillet/verification` is a package for one type, and folding it
+  into an existing one wants a reason. Whichever is chosen, the doc comment has to say that
+  the fold is deliberately absent and why, or the next reader adds one.
+
+- [x] **Make `Title` stop inventing capitalization.** DONE 2026-09-07. `naming.Title` now
+  joins `strings.FieldsFunc` output with single spaces and changes no case, so
+  `composite-slo` yields `composite slo`.
+  **`FieldsFunc` rather than the old regexp split, which fixed a latent defect in passing:**
+  the split kept empty fields, so `Title("-a")` returned a leading space. `reAllWordSep` had
+  no other caller and is deleted — one fewer package-level global.
+  **Four tests asserted the old shape, in three packages**, which is the useful surprise:
+  `naming.TestTitle`, `naming.TestTitleFromFile`, `ruleset/distill.TestGenerate`, and
+  `ruleset/synthesize.TestLoadInputsSortsSkipsAndTitles`. Each now asserts the lower-case
+  form *next to* an authored-H1 case that keeps its capitals, because that contrast is the
+  point: an authored title has casing to preserve and a derived one never did.
+  **`TestTitle` gained the cases the decision was taken on** — an acronym, a project name, an
+  unrecoverable internal capital, and a surrounding separator — so the reason is legible from
+  the test rather than only from this entry.
+  **Consumers are safe, checked rather than assumed.** exegesis calls `Title(slug)`
+  unconditionally but asserts only slugs (`**alpha**`, `beta -->|depends-on| alpha`), and
+  `Title("alpha")` now returns `alpha`, so its assertions are if anything likelier to hold.
+  skillet's own `related/graph_test.go` passes `Title` values explicitly and never calls the
+  function. **One cosmetic residue, left deliberately:** `distill` appends `" Rules"` to the
+  title, so a stem-derived link reads `wtf dial Rules`. Lower-casing the literal would be
+  wrong on the primary path, where the title comes from an authored H1 and reads
+  `CRUD Patterns Rules`. Original entry: The 2026-09-07 decision above, as
+  work: `naming.Title` replaces separators and leaves case alone, so `composite-slo` becomes
+  `composite slo` and no stem yields a spelling the function cannot know. Its three call
+  sites — the Mermaid label via `related/graph.go:245`, the `source=` attribute in
+  `ruleset/synthesize/synthesize.go:52`, and the link text in
+  `ruleset/distill/distill.go:111` — take the new output unchanged; none needs a signature
+  change. The doc comment is half the deliverable: it has to say that a lowercase stem
+  carries no capitalization to recover, so a reader does not re-add the table later.
 
 **Two measurements argue the heading half is already solved here by convention.** MD063
 damage in this repo's own headings is one line: `TODO.md:299` reads `2Nd Consumer: Adh`, and

@@ -10,11 +10,25 @@ import (
 
 func TestTitle(t *testing.T) {
 	t.Parallel()
+	// The first four are the original cases with the capitals removed. The rest are the
+	// cases the 2026-09-07 decision was taken on, kept here so a reader can see *why* the
+	// function stopped capitalizing rather than only that it did.
 	tests := []struct{ in, want string }{
-		{"my-source_file", "My Source File"},
-		{"crud", "Crud"},
-		{"wtf-dial", "Wtf Dial"},
+		{"my-source_file", "my source file"},
+		{"crud", "crud"},
+		{"wtf-dial", "wtf dial"},
 		{"", ""},
+
+		// An acronym. 76 of 342 slugs carry one; the old code wrote "Composite Slo".
+		{"composite-slo", "composite slo"},
+		// A project name. The old code wrote "Climax Cli Scaffold" -- wrong twice over.
+		{"climax-cli-scaffold", "climax cli scaffold"},
+		// Internal capitals are unrecoverable from a lowercase stem either way, and the
+		// point is that the function no longer guesses: "Skilllens" was never right.
+		{"skilllens-dimensions", "skilllens dimensions"},
+		// Surrounding and repeated separators. The old split kept empty fields, so this
+		// returned " a b " with the spaces attached.
+		{"-a__b-", "a b"},
 	}
 	for _, tt := range tests {
 		if got := naming.Title(tt.in); got != tt.want {
@@ -80,7 +94,10 @@ func TestTitleFromFile(t *testing.T) {
 	if err := os.WriteFile(noH1, []byte("just prose, no heading\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := naming.TitleFromFile(noH1); err != nil || got != "Wtf Dial" {
-		t.Errorf("TitleFromFile(noH1) = %q, %v; want %q (from stem)", got, err, "Wtf Dial")
+	// Lower case, because the fallback goes through Title and Title stopped guessing
+	// capitalization. The contrast with the H1 case above is the whole point: an authored
+	// title keeps its author's casing, a derived one has none to keep.
+	if got, err := naming.TitleFromFile(noH1); err != nil || got != "wtf dial" {
+		t.Errorf("TitleFromFile(noH1) = %q, %v; want %q (from stem)", got, err, "wtf dial")
 	}
 }
