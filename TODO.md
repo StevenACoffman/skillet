@@ -2897,3 +2897,72 @@ forward reference in the entry above.
   false alarms than to misses, and the negative case is the one an author will not write
   unprompted — so the form should make it impossible to record one example without the other.
   Consumer: canonizer's per-rule soundness gate.
+
+## Where a Verification Event Is Stored, and a Record That Already Has Its Shape (2026-09-07)
+
+Source: canonizer went to adopt `verification.Event` for its `anchor-absent` split and found
+the type available and no artifact able to hold one. Both items below are kernel questions
+that surfaced from a consumer; neither is canonizer's to answer, which is the point.
+
+- [ ] **No artifact carries verification events, so canonizer cannot adopt `Event` — and
+  the precedent for where they go is already set by both other consumers.** `Event` is a
+  record, and nothing canonizer writes holds a list of them: rulesets carry no provenance
+  metadata, `proof.Packet` is `{Arc, Provenance{GitSHA}, Artifacts}`, and `finding.Result` is
+  `{Diagnostics, Unexamined}` where an envelope would change the format its consumers read.
+  **Both existing consumers store events in the artifact the events are about, under a
+  `verified` key**, and neither invented a side channel. gnosis reads OKF §5.2's list from
+  **document frontmatter** (`bundle.verifiedOf`, tolerating a bare mapping or bare actor per
+  §11); adh **appends to the unit's own file** (`contextstore.RecordVerification`, decoding
+  to raw messages and re-encoding so unmodelled fields survive). canonizer's artifact is the
+  ruleset, so the matching slot is **a `Verified:` header at format 4, beside
+  `Limitations:`** — not a field on `proof.Packet`, which was the other candidate here until
+  the precedent was checked.
+  It is also the only option that satisfies the canonizer entry's *own* stated trigger,
+  *"if rulesets ever carry provenance metadata"*, which a proof-packet field would leave
+  unmet.
+  **Correction: this package is not unimported, and its own doc says otherwise.** Both gnosis
+  and adh pin v0.31.0 and use `verification.Event` today. The doc's *"It has no importers
+  yet"* paragraph, and its `provenance` comparison, are stale and should be rewritten to say
+  what is now true: two importers, and a third consumer blocked on a slot rather than on
+  interest.
+  **A write path needs adh's actor policy, not a flag.** `RecordVerification`'s doc settles
+  the objection canonizer raised against a `--verified-by` flag: *"the actor must come from
+  the repository's configured identity, never from a flag on the invocation: a
+  caller-supplied actor would let anyone mint a `human:` event."* Config-derived is still
+  self-asserted — attributable rather than authenticated — and adh states that limit rather
+  than implying it. Worth copying too: adh **refuses** a unit storing a bare legacy tier
+  instead of converting it, because inventing an actor is dishonest and dropping it discards
+  a human's judgement.
+- [x] **`ruleset.Warrant` and `verification.Event` share a shape and should stay unrelated.**
+  ANSWERED 2026-09-07 after comparing both types' usage across all four repositories. The
+  question was whether `Rationale` belongs on `Event`, whether `Warrant` is a superset, or
+  whether they are distinct. **Distinct**, and the structural overlap is a coincidence of
+  two fields rather than a relationship.
+  **They are different speech acts.** A **warrant** substitutes for evidence: an adjudicated
+  rule *carries no anchor by construction*, so the warrant is the only evidence there is, and
+  `Rationale` is required because it is the only reviewable content — canonizer's `unanchored`
+  reads it in exactly the branch where `SourceAnchor` is empty. An **event** attests to
+  evidence that already exists: the artifact stands on its own content and the event records
+  who confirmed it. One creates standing; the other witnesses it.
+  **So `Rationale` must not be added to `Event`, and the reason is the list.** `Verified` is
+  list-valued and mixes human and machine actors — adh's vocabulary has `check:` alongside
+  `human:`. A required rationale on every event either blocks automated verification, which
+  has none to give, or fills with the boilerplate this file already names as what a
+  required-but-unread field attracts (`Unexamined.Reason`'s doc). Optional would be worse:
+  a field present on some events and not others invites a fold that reads it, which is the
+  fold this package deliberately does not have.
+  **And `Warrant` must not embed `Event`**, because the subtyping runs the wrong way. "A
+  warrant is a kind of verification" implies there was something to verify, and the case a
+  warrant exists for is precisely that there is not.
+  **A third record settles it rather than complicating it.** gnosis carries its own
+  `Warrant{By, At, Authority, Review, Rationale, CoSignedBy}` for §10.6.4, deliberately
+  richer than `ruleset.Warrant` — whose doc already says the smaller shape is intentional
+  and that tiers, co-signers and reversal links *"belong to a consumer's authority model"*.
+  So the family already holds two warrants of different sizes on purpose. A third
+  relationship between warrant and event would be the fourth arrangement of the same nouns.
+  **What is genuinely shared is the representation of `By`, and it is already documented at
+  both ends.** gnosis's `Warrant.By` says it is a raw string *"for the reason
+  verification.Event.By is one"* — OKF §14.1.1 makes frontmatter actors a wider population
+  than a parsed actor type, and §11 forbids rejecting a conformant document over an optional
+  family's shape. That convention is worth stating once here so the next reader meets it
+  before re-deriving the merge question: **the actor grammar is shared; the records are not.**
