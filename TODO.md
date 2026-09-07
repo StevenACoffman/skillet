@@ -1147,7 +1147,18 @@ met before the knowledge-base tool exists at all.
     adoption is incremental by specification.
   When it does land it belongs **in the one consumer that needs it** until a second appears,
   exactly as `quotecheck` stayed in exegesis.
-- [x] **Adjudication is a distinct artifact from detection.** DONE 2026-08-27 — see the entry below. Original entry: When two
+- [x] **Adjudication is a distinct artifact from detection.** DONE 2026-08-27 — see the entry below.
+  **Resolved in "The Warrant, the Shared Rule, and Manifest Edges" further down this file,
+  and the `adjudication-artifact` hold is retired (2026-09-06).** The blocker this entry
+  names — a per-rule warrant needing the format version to ship first — went: the version
+  reader is format 1, the `⚖` marker is format 2, and `ruleset.Rule.Warrant{By, At,
+  Rationale}` shipped in v0.29.0 with `Valid` requiring `By` and `Rationale`, which is the
+  shape this entry specified down to *"and nothing else"*.
+  **The hold outlived its condition by ten days, and the reason is a locator.** It pointed
+  here, where the question is asked, while the answer was written 1100 lines below — so
+  following `where` landed a reader on the held entry with no sign it had been settled. A
+  forward pointer at the moment of resolution is what was missing, which is why this one
+  now exists. Original entry: When two
   rules conflict and a human picks one, the decision is knowledge present in neither source
   — so it can carry no `↦` anchor and **fails `verify.Provenance` by construction.** That
   is the highest-value thing the team produces and the corpus has nowhere to put it. Shape,
@@ -2306,7 +2317,17 @@ a cost. Edges live in SKILL.md, so any edge change already moves `Hash` and surf
 `Axes.Skill`; feeding them to `axes` as well would report one change on two axes. The
 control confirms it — wiring edges into `axes` fails `TestEdgesAreRecordedNotDiffed`.
 
-- [ ] {blocked-external} **The inert-render property is proven on a fixture, not on the corpus.** The format
+- [ ] {blocked-external} **The inert-render property is proven on a fixture, not on the corpus.**
+  **Re-measured 2026-09-06 against format 3 and the entry still stands, with a trap the
+  earlier runs did not surface.** Over five trees: **93 candidates carrying a `§` line, 23
+  returning no error from `ruleset.Parse`, and 0 of those carrying a single rule.** The 23
+  are prose — `PLAN.md`, `SPEC.md`, this file — which `Parse` tolerates as a degenerate
+  empty format-1 ruleset. **A count of "parses" would therefore report 23 and read as
+  satisfied while the honest answer is 0**, which is why the `inert-render-corpus` hold is
+  `manual` rather than a pattern. Format 3 was never going to change this: it adds a
+  `Limitations:` header and the `⊨` marker, while what disqualifies these files is the
+  absence of `Source:`/`Scope:` and of a well-formed `§x.y  [SEV][LEVEL]` rule. The
+  candidate count grew from 66; what it measures did not. Original entry: The format
   entry's standard was *"all 29 stored rulesets render byte-identically… proven on the real
   corpus rather than fixtures"*, and no canonical-form ruleset is checked out on this
   machine — 59 files carry `§` lines and none parses as the form. So

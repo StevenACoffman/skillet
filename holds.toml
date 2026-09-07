@@ -106,11 +106,16 @@ kind      = "manual"
 condition = "a 2nd caller that must act on a specific rewrite; only one of seven admits a distinct action"
 where     = "TODO.md — testprompts.File.Rewrites can be printed but not classified"
 
-[[hold]]
-id        = "adjudication-artifact"
-kind      = "manual"
-condition = "blocked on the ruleset format version, not on consumer count; three repos already specify it"
-where     = "TODO.md — Adjudication is a distinct artifact from detection"
+# Retired 2026-09-06: adjudication-artifact. Its condition was "blocked on the ruleset
+# format version", and all of it shipped — the version reader is format 1, the ⚖ warrant
+# marker is format 2, and `ruleset.Rule.Warrant{By, At, Rationale}` is in v0.29.0 onward,
+# which is the shape the held entry specified down to "and nothing else".
+#
+# **It reported `manual` on every run for ten days after it was satisfied**, which from the
+# outside is indistinguishable from a condition that has not fired — the fifth instance of
+# the failure this file's header exists to record. A contributing cause worth naming: its
+# `where` pointed at the held entry, while the resolution was written into a later section
+# 1100 lines down, so a reader following the locator never saw it was answered.
 
 [[hold]]
 id        = "warrant-cited-unbuilt"
@@ -151,7 +156,13 @@ condition = "a stored ruleset in the canonical form exists anywhere, so the byte
 where     = "TODO.md — The inert-render property is proven on a fixture, not on the corpus"
 # A count was considered and refused twice over. The canonical rule header is
 # "§<section>  [SEVERITY][LEVEL]  statement", and `pattern` is a plain string, so the only
-# greppable part is the section sign — which was measured across five trees on 2026-08-27 as
-# **66 candidate files, 0 parsing as a ruleset**. A hold on it would report met against a
-# condition its own entry says has not fired, exactly as okf-fold did on "machine-confirmed".
-# The condition is "parses as the form", which is a parser's answer and not a pattern's.
+# greppable part is the section sign. Re-measured 2026-09-06 against format 3 (v0.30.0,
+# which every consumer now pins): **93 candidate files, 23 returning no error from
+# ruleset.Parse, and 0 of those carrying a single rule.** The 23 are prose documents —
+# PLAN.md, SPEC.md, this repo's own TODO.md — that Parse tolerates as a degenerate empty
+# format-1 ruleset.
+#
+# **So a count would report met at 23 while the honest answer is 0**, which is okf-fold's
+# false-met exactly. The condition is "parses as the form *and carries a rule*", which is a
+# parser's answer and not a pattern's. Only the candidate count moved, from 66; what it
+# measures did not.
