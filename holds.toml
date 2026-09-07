@@ -19,6 +19,19 @@
 # modelling one as a hold makes `met` mean both "act now" and "all is well". That
 # check wants CI, not this file.
 
+# **An item in TODO.md tagged `{await-trigger}` or `{blocked-external}` wants a hold
+# here.** Those two tags mark an item whose condition is external to the item itself,
+# which is the same thing this file records — and a tagged item with no hold is a
+# condition with no observer, the failure the four criteria above are the record of. The
+# other tags do not: `{blocked}` names a dependency on another backlog item, `{cross-repo}`
+# names who does the work, and `{decision-needed}` has nothing that can fire, so a hold for
+# one would be the never-firing kind this file warns about.
+#
+# Nothing checks the correspondence mechanically, deliberately. Reading it would mean
+# knowing which TODO.md sits where relative to the roots — the machine-specific fact the
+# no-default-roots decision refuses to encode — and parsing a checkbox line, which is the
+# same prose-matching `condition` is exempt from. It is a rule for whoever adds a tag.
+
 [[hold]]
 id        = "bandit"
 kind      = "count"
@@ -118,3 +131,27 @@ where     = "gnosis SPEC.md §10.6.4 — load-bearing outside gnosis before any 
   exclude   = "*_test.go"
   threshold = 1
   compare   = "at-least"
+
+[[hold]]
+id        = "verdict-act"
+kind      = "manual"
+condition = "a tool in the family performs semantic replay, so the field could read performed"
+where     = "TODO.md — manifest.Manifest has no field saying which act produced the verdict"
+# Not a count, and not for want of a pattern. Today the field would be a constant:
+# exegesis is the structural half by charter and never replays, so "which act produced this"
+# has one possible answer and a one-valued field on a kernel type is how `provenance` came
+# to be carried with zero importers until v0.20.0 deleted it. What makes the field carry
+# information is a *replayer or grader existing*, which is a claim about what a tool does
+# rather than a string any of them contains — the okf-fold lesson, one hold up.
+
+[[hold]]
+id        = "inert-render-corpus"
+kind      = "manual"
+condition = "a stored ruleset in the canonical form exists anywhere, so the byte-identical claim can be checked on a corpus"
+where     = "TODO.md — The inert-render property is proven on a fixture, not on the corpus"
+# A count was considered and refused twice over. The canonical rule header is
+# "§<section>  [SEVERITY][LEVEL]  statement", and `pattern` is a plain string, so the only
+# greppable part is the section sign — which was measured across five trees on 2026-08-27 as
+# **66 candidate files, 0 parsing as a ruleset**. A hold on it would report met against a
+# condition its own entry says has not fired, exactly as okf-fold did on "machine-confirmed".
+# The condition is "parses as the form", which is a parser's answer and not a pattern's.

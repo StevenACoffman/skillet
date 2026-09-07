@@ -30,6 +30,13 @@ Tags compose (`{await-trigger} {blocked}`). An untagged `[ ]` is a claim that th
 be picked up today, so tagging is not decoration: `[ ]` alone used to cover both actionable
 and trigger-held work, which made a box count overstate what was open.
 
+**`{await-trigger}` and `{blocked-external}` also want a hold in `holds.toml`**, because
+those two mark a condition external to the item, and a condition with no observer is what
+that file exists to prevent. The other three do not: `{blocked}` points at another item
+here, `{cross-repo}` names who does the work, and `{decision-needed}` has nothing that can
+fire. Nothing checks the correspondence mechanically — see the reasoning in that file's
+header.
+
 ## Preserve Mature Libraries (Hard Constraint)
 
 Where two source repos agree, keep whatever third-party library the originals used to
