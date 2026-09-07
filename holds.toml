@@ -68,11 +68,19 @@ where     = "TODO.md — the Skip{Check, Reason} trigger, under the applicabilit
   threshold = 2
   compare   = "at-least"
 
-[[hold]]
-id        = "okf-fold"
-kind      = "manual"
-condition = "the 2nd repo that derives a trust tier from an actor list, not the 2nd that spells a tier name"
-where     = "TODO.md — OKF's trust fields, replacement trigger"
+# Retired 2026-09-07: okf-fold. Its condition — "the 2nd repo that derives a trust tier
+# from an actor list" — fired. gnosis's FoldTrust and adh's contextstore.Trust.Tier both
+# do, and gnosis's file was untracked when this hold was written, which is why the count
+# read 1 for two weeks after it was really 2.
+#
+# The answer was not the promotion the trigger implied. The two derivers agree on the
+# *record* (both hand-wrote `Verification{By, At}`) and differ on the *fold* by design, so
+# the record is promoted and the fold is not. Recorded in TODO.md, which is where a hold's
+# argument lives.
+#
+# **A manual hold cannot report its own condition firing.** This is the second in this file
+# to be satisfied and keep printing `manual`, after adjudication-artifact. Both were found
+# by a person reading, which is what the tool was meant to replace.
 # Was kind = "count" on pattern = "machine-confirmed", threshold 2. It reported met on
 # 2026-08-23 against a condition its own entry says has not fired, in two ways worth keeping:
 #

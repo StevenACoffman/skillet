@@ -10,24 +10,42 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
-var (
-	reWordSep    = regexp.MustCompile(`[\s\-]+`)
-	reAllWordSep = regexp.MustCompile(`[\s_\-]+`)
-)
+var reWordSep = regexp.MustCompile(`[\s\-]+`)
 
-// Title converts a filename stem into a readable title:
-// "my-source_file" -> "My Source File".
+// Title converts a filename stem into a readable label: runs of space, underscore and
+// hyphen become single spaces, and nothing else changes.
+//
+// **It does not capitalize, and that is the point.** It used to upper-case the first letter
+// of every word, which meant inventing a spelling it had no way to know. Measured over 342
+// skill slugs it got **78 (22%) wrong** -- 76 of them acronyms (`composite-slo` became
+// `Composite Slo`) and 3 project names (`climax-cli-scaffold` became `Climax Cli Scaffold`).
+// A lowercase stem carries no capitalization to recover, so any capital produced here is
+// guessed. A stem -> canonical-title table was the alternative and was refused on
+// 2026-09-07: it needed ~78 entries on the day it shipped and one more per skill after,
+// and no authored display title exists anywhere in the corpus to fill it from -- 273 of 288
+// skills declare `name:` as the slug itself. See skillet's TODO.md.
+//
+// The name is unchanged because the package's other Title* functions return a document's
+// real title and this one still answers "the title for this stem"; what changed is that it
+// no longer claims to know its casing.
+//
+// Requires: stem is a filename stem; separators are whitespace, underscore or hyphen.
+// Ensures:  pure. Separator runs collapse to one space, case is never altered, and leading
+//
+//	or trailing separators produce no leading or trailing space.
 func Title(stem string) string {
-	words := reAllWordSep.Split(stem, -1)
-	for i, w := range words {
-		if w == "" {
-			continue
-		}
-		words[i] = strings.ToUpper(w[:1]) + w[1:]
-	}
-	return strings.Join(words, " ")
+	return strings.Join(strings.FieldsFunc(stem, isSeparator), " ")
+}
+
+// isSeparator reports whether r separates words in a filename stem.
+//
+// FieldsFunc rather than a regexp split because it drops empty fields: the old split kept
+// them, so `Title("-a")` returned a leading space. Fixed in passing rather than preserved.
+func isSeparator(r rune) bool {
+	return unicode.IsSpace(r) || r == '_' || r == '-'
 }
 
 // RulesFilename derives the destination rules filename from a source filename:

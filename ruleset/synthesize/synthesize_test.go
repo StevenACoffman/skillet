@@ -64,8 +64,11 @@ func TestLoadInputsSortsSkipsAndTitles(t *testing.T) {
 		t.Fatalf("got %d inputs, want 2 (the non-_rules.md file is skipped)", len(inputs))
 	}
 	// os.ReadDir is name-sorted, so a_rules.md precedes b_rules.md.
-	if inputs[0].Title != "A" { // no H1 -> filename fallback: "a" -> "A"
-		t.Errorf("inputs[0].Title = %q, want %q (filename fallback)", inputs[0].Title, "A")
+	// The fallback passes the stem through naming.Title unchanged in case, so "a" stays "a".
+	// inputs[1] below keeps its capitals because they came from an authored H1, which is the
+	// distinction: a derived title has no casing to preserve and no longer invents one.
+	if inputs[0].Title != "a" { // no H1 -> filename fallback: "a" -> "a"
+		t.Errorf("inputs[0].Title = %q, want %q (filename fallback)", inputs[0].Title, "a")
 	}
 	if inputs[1].Title != "Beta Rules" { // first H1 wins
 		t.Errorf("inputs[1].Title = %q, want %q (from H1)", inputs[1].Title, "Beta Rules")
