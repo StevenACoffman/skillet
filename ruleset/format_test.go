@@ -247,3 +247,53 @@ func TestALimitationsFreeRulesetIsUntouched(t *testing.T) {
 		t.Errorf("round-trip is not byte-identical:\n got %q\nwant %q", got, v1Doc)
 	}
 }
+
+// TestARationaleMayBeginWithProseSymbols is the measured defect: applyBody rejected every
+// Unicode symbol, and two of those categories are ordinary prose. A rationale opening with
+// a code span cost 2 of 8 rulesets in the first real batch, because one bad line fails a
+// whole document.
+func TestARationaleMayBeginWithProseSymbols(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		rationale string
+		wantErr   bool
+	}{
+		// Sk. The case that was measured, and the one the prompt's "backtick every
+		// identifier" convention makes common.
+		"opens with a code span": {
+			rationale: "`Error()` prints the wrapped error's text in place of `Code`.",
+		},
+		// Sc, one category over and broken for the same reason.
+		"opens with a currency sign": {
+			rationale: "$HOME is read at startup, so a relative path resolves differently.",
+		},
+		// The prose openers the doc always claimed to permit -- all punctuation, so they
+		// never met the old test either. Kept so the promise is checked, not assumed.
+		"opens with an em dash":    {rationale: "— a leading dash is prose, not a marker."},
+		"opens with a parenthesis": {rationale: "(as the source notes) this is prose."},
+		"opens with a quotation":   {rationale: `"quoted prose" is still prose.`},
+		// Still rejected, and deliberately: Sm is where two markers live, so the guard
+		// cannot exempt it without losing the property it exists for.
+		"opens with a math symbol is still refused": {
+			rationale: "<nil> is returned when the row set is empty.", wantErr: true,
+		},
+		// The guard's whole purpose: a marker from a newer format must not be absorbed.
+		"opens with an unknown So marker is still refused": {
+			rationale: "☂ a marker this version does not know", wantErr: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			doc := "Source: s\nScope:  x\n\n§1.1  [MUST][CODE]  Close it.\n      " +
+				tc.rationale + "\n"
+			_, err := ruleset.Parse(doc)
+			if tc.wantErr && err == nil {
+				t.Errorf("Parse accepted %q; the marker guard must still refuse it", tc.rationale)
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("Parse(%q) = %v; this is prose somebody will write", tc.rationale, err)
+			}
+		})
+	}
+}

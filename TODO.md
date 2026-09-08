@@ -2966,3 +2966,97 @@ that surfaced from a consumer; neither is canonizer's to answer, which is the po
   than a parsed actor type, and §11 forbids rejecting a conformant document over an optional
   family's shape. That convention is worth stating once here so the next reader meets it
   before re-deriving the merge question: **the actor grammar is shared; the records are not.**
+
+## `ruleset/distill.Generate` Lost Its Only Caller (2026-09-07)
+
+Source: canonizer needed each prompt to name a ruleset destination other than "beside the
+source", which `Generate`'s signature cannot express — the path is computed as
+`filepath.Join(filepath.Dir(absSource), naming.RulesFilename(base))` with nothing to
+override it. It now walks the tree itself in `internal/distillgen` and calls `FillTemplate`.
+
+- [ ] **`Generate` has no caller outside its own test; `FillTemplate` keeps two.** Measured
+  across canonizer, exegesis, skillsaw, gnosis and adh: the only `distill.Generate(` in the
+  family is `ruleset/distill/distill_test.go:53`. `FillTemplate` is still imported by
+  canonizer, so the package stays either way — this is about the function.
+  **The split it leaves behind is the one this module usually wants.** `FillTemplate` is
+  pure, is the piece two tools share, and is what a consumer cannot sensibly reimplement.
+  `Generate` is a directory walk plus a write, and a walk is the part every consumer ends up
+  wanting to parameterise: exegesis walks trees itself in `indexgen` over `skill.Discover`
+  rather than asking skillet to walk for it, and canonizer has now arrived at the same
+  arrangement from the other direction.
+  **So the question is whether to delete it or to widen it**, and the answer turns on
+  something not visible from here: whether a second consumer will ever distil. If not,
+  deleting is the `provenance` remedy applied on time rather than three releases late.
+  If widening, the missing parameter is a rules-output directory, and the caller that
+  needed it is `canonizer distill --rulesout`.
+  **Not urgent, and worth stating why it is filed anyway.** A function with one test and no
+  caller costs nothing until someone reads it as the supported path and builds on it — which
+  is exactly what canonizer did, then had to undo. The entry exists so the next reader meets
+  the fork before choosing.
+
+## A Rationale May Not Begin with a Backtick, and It Should (2026-09-07)
+
+Found by running canonizer's gates over the first full batch this pipeline has produced:
+eight rulesets, 162 rules, distilled from real sources. **Two of the eight are unparseable**,
+and the whole document fails on one line each.
+
+```console
+$ canonizer verify --ruleset failure_is_your_domain_rules.md --source ...
+error: verify: parse ruleset: ruleset: unrecognised marker "`" in
+"`Error()` prints the wrapped error's text in place of `Code` and `Message`, …";
+a rationale may not begin with a symbol
+```
+
+- [x] **`applyBody` rejects every Unicode symbol, and the markers only occupy two of its
+  categories.** DONE 2026-09-07. `markerLike` replaces `unicode.IsSymbol` and tests `So` and
+  `Sm` only, so `Sk` (backtick, caret) and `Sc` (currency) read as prose.
+  **Measured against the batch that found it, with a temporary `replace` and no other
+  change: the two unparseable rulesets now parse — 19 of 20 and 25 of 28 rules examined —
+  and the six that already parsed produce byte-identical diagnostic counts.** The replace
+  was removed afterwards; canonizer still builds on the released v0.31.0.
+  **The test was checked against the old behaviour rather than assumed to work.** Reverting
+  `markerLike` to `unicode.IsSymbol` fails 4 of the new table's 7 cases; restoring it passes
+  them. A test that would pass either way proves nothing, and this one was written to catch
+  a defect that had already shipped.
+  **Drift is a test, not a runtime derivation.** A first attempt computed the permitted
+  categories from `markers()` so a marker added in `Sc` would widen the guard automatically.
+  Rejected: that is a mechanism more complex than its problem, and
+  `TestEveryMarkerIsNonASCII` already turns an intention about the marker set into a checked
+  claim. It gained one assertion — every marker is `So` or `Sm` — which fails and names the
+  fix if a future marker lands elsewhere.
+  **What stays rejected, and it is in the doc rather than left to be discovered:** `Sm` also
+  holds `< + = ~ |`, so `<nil> is returned when …` is still a parse error. Narrower than
+  before, not nothing, and widening further wants its own evidence. Original entry: The guard is `unicode.IsSymbol(first)`, which spans `So Sm Sk Sc`. Measured:
+
+| runes           | category | today    |
+| --------------- | -------- | -------- |
+| `✗ ✓ ⚖` markers | `So`     | rejected |
+| `↦ ⊨` markers   | `Sm`     | rejected |
+| `` ` `` `^`     | `Sk`     | rejected |
+| `$` `£`         | `Sc`     | rejected |
+| `— “ " ' ( [`   | `P*`     | prose    |
+
+  Every marker the form defines is `So` or `Sm`. Every prose opener the doc names as
+  legitimate — *"an em dash, a curly quotation mark, or a parenthesis"* — is punctuation,
+  which is why the gap went unnoticed: the doc's own examples all sit on the safe side by
+  accident of category rather than by design.
+  **A backtick is `Sk`, and it opens a code span.** A rationale beginning
+  `` `Error()` prints … `` is exactly the *"prose somebody will write"* the doc says the
+  rule is narrow in order to permit. `$HOME is read at startup` fails for the same reason
+  one category over.
+  **Recommended: narrow the guard to the categories markers actually use.** It keeps the
+  property the guard exists for — a marker from a newer format version is a deliberate
+  typographic symbol, and will be `So` or `Sm` like the five that exist — while letting
+  code spans and currency through.
+  **Residual to state rather than hide:** `Sm` also holds `< + = ~ |`, so
+  `<nil> is returned when …` stays rejected. That is narrower than today and still not
+  nothing. The alternative is an explicit prose allowlist (backtick, currency), which fixes
+  the measured case and leaves the category confusion in place.
+  **Frequency, because it argues against urgency and for the fix anyway:** 3 of 299 body
+  lines across the batch begin with a backtick. One line fails a document, so 3 lines cost
+  2 of 8 rulesets — the cheapest possible defect to hit and among the most expensive to
+  suffer.
+  **Note the interaction that surfaced it.** canonizer had just added *"Backtick every
+  identifier"* to its distill prompt, to stop `Specificity` measuring typography. That fix
+  is right and it raised the rate of rationales opening with a code span. Two correct
+  changes, one latent parser bug between them.

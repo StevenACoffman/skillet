@@ -172,5 +172,13 @@ func TestEveryMarkerIsNonASCII(t *testing.T) {
 				m,
 			)
 		}
+		// applyBody rejects only So and Sm, the two categories the markers occupy. A
+		// marker added in Sk or Sc would open a line the guard cannot see -- and widening
+		// the guard back to every symbol is what rejected a rationale beginning with a
+		// backtick (Sk), so the fix is a marker in a different category, not a wider guard.
+		if !unicode.Is(unicode.So, first) && !unicode.Is(unicode.Sm, first) {
+			t.Errorf("marker %q is not in So or Sm, the categories applyBody rejects; "+
+				"either move the marker or widen markerLike deliberately", m)
+		}
 	}
 }
