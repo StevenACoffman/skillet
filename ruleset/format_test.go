@@ -109,6 +109,7 @@ func TestFormatVersionTracksTheMarkerSet(t *testing.T) {
 		1: 3, // ✗ ✓ ↦
 		2: 4, // + ⚖
 		3: 5, // + ⊨ (Limitations: rides the same bump but is a header, not a marker)
+		4: 5, // unchanged: verified: is a frontmatter key, not body vocabulary
 	}
 	want, recorded := markersAt[ruleset.FormatVersion]
 	if !recorded {

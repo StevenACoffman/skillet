@@ -14,23 +14,39 @@ import (
 
 	"github.com/StevenACoffman/skillet/frontmatter"
 	"github.com/StevenACoffman/skillet/judge"
+	"github.com/StevenACoffman/skillet/verification"
 )
 
 // FormatVersion is the canonical-form major version this package writes and is the
 // highest it can read.
 //
-// Bump it only when the grammar itself changes -- not to record provenance, tool identity
-// or scoring metadata. identity.Hash already pins which bytes produced what, and a format
-// version that accumulates those becomes a second manifest.
+// Bump it only when the grammar itself changes -- not to record metadata identity.Hash
+// already establishes, such as tool identity or scoring. A hash pins which bytes produced
+// what, and a format version that accumulates the same facts becomes a second manifest.
 //
-// It is 3. Version 1 was the version reader itself, which changed no grammar; version 2
+// **That prohibition read "not to record provenance" until version 4, and the wording was
+// wider than its own reason.** The ground it gives is that identity.Hash covers the fact
+// already, which is true of tool identity and untrue of a verification event: a hash
+// establishes which bytes exist and cannot say who read them and agreed. Version 4 records
+// exactly that, so the sentence was narrowed to what it argues for rather than bent. The
+// "second manifest" warning stands and is still the right fear.
+//
+// It is 4. Version 1 was the version reader itself, which changed no grammar; version 2
 // adds the ⚖ warrant marker; version 3 adds the Limitations: header and the ⊨ check marker,
 // batched into one bump because each is a grammar change and shipping them apart would
-// migrate every stored ruleset twice. A document is only *written* at a version when it
-// uses something that version introduced -- see formatOf -- so every ruleset written before
-// still renders byte-identically, which is the property the reader was shipped early to
-// protect.
-const FormatVersion = 3
+// migrate every stored ruleset twice; version 4 adds the frontmatter block's verified key.
+//
+// **Version 4 is a bump rather than a tolerated unknown key, and the alternative is worse.**
+// An unmodelled verified: already parses without error and is then dropped by Render, so
+// leaving the version at 3 would let an older tool round-trip a verified ruleset and lose a
+// human's judgement with no error at all. That is the silent loss the block was introduced
+// to convert into a loud refusal -- see readFrontmatter -- so a key a reader must model to
+// preserve is a grammar change by this constant's own test.
+//
+// A document is only *written* at a version when it uses something that version introduced
+// -- see formatOf -- so every ruleset written before still renders byte-identically, which
+// is the property the reader was shipped early to protect.
+const FormatVersion = 4
 
 // Severity is how strictly a Rule is enforced.
 const (
@@ -104,12 +120,45 @@ type Ruleset struct {
 	// omits the header entirely when it is empty -- so an existing document is untouched
 	// and does not suddenly declare a version it does not need.
 	Limitations string
+	// Format and Verified are the frontmatter block; the three fields above are body
+	// headers. They are grouped by where they live in the file because that is the question
+	// a reader of this struct is usually answering.
+
 	// Format is the canonical-form major version this ruleset is written in. A file that
 	// declares none is 1, so the zero value reads correctly for every ruleset written before
 	// versioning existed -- unlike finding.Action, whose zero value had to mean "nobody
 	// judged", a missing format genuinely *is* version 1.
 	Format int
-	Rules  []Rule
+
+	// Verified is the independent verification events attesting to this ruleset: who
+	// confirmed it, and when. It is OKF §5.2's list rather than a single trust tier, and
+	// deriving a tier from it belongs to a consumer -- see the verification package, which
+	// leaves the fold out for the same reason.
+	//
+	// **The events attest to the rules, not to the bytes.** identity.Hash pins bytes and a
+	// proof packet binds a ruleset to its source; neither can say a person read the rules
+	// and agreed, which is what this carries and why it is not derivable from content.
+	// The corollary is that an event outlives the text it attested to: nothing here
+	// re-checks it when a rule changes, so a consumer comparing an event against a later
+	// revision is reading a claim about an earlier one.
+	//
+	// Empty is the ordinary case for every ruleset written before version 4, and Render
+	// emits nothing for it, so an existing document is untouched.
+	Verified []verification.Event
+
+	Rules []Rule
+}
+
+// frontmatterBlock is the ruleset's leading YAML block, and it is a type rather than a
+// pair of return values because readFrontmatter would otherwise return four things.
+//
+// The yaml tags are not strictly needed -- yaml.v3 lowercases field names, so By and At
+// would land on by and at regardless -- and they are written because without them the wire
+// format is an implicit consequence of the Go names, and a rename would change the format
+// silently.
+type frontmatterBlock struct {
+	Format   int                  `yaml:"format"`
+	Verified []verification.Event `yaml:"verified"`
 }
 
 // Valid reports whether s is a known severity.
@@ -132,50 +181,51 @@ func (l Level) Valid() bool {
 	}
 }
 
-// readFormat takes the optional leading YAML block off md and returns the canonical-form
-// major version it declares, defaulting to 1 when there is none.
+// readFrontmatter takes the optional leading YAML block off md and returns what it
+// declares, defaulting to version 1 when there is none.
 //
 // A version newer than this parser understands is an error rather than a best effort. The
 // whole reason the block exists is that an unknown marker line is otherwise folded into a
 // rule's rationale, silently: refusing loudly is the behaviour being bought.
 //
+// It was readFormat until version 4 gave the block a second key. A function named for one
+// field that returns two is the name telling a reader less than the code does, so it reads
+// the block and is named for it.
+//
+// **Nothing here tolerates a bare actor or a bare mapping under verified.** gnosis accepts
+// both, because OKF §11 forbids rejecting a conformant document over an optional family's
+// shape and gnosis reads documents that predate its own reader. This key has no such
+// population: version 4 invents it, so there is no legacy to be lenient towards, and
+// writing the leniency anyway would be special-case handling for a case that cannot exist.
+//
 // Requires: nothing.
-// Ensures:  the returned format is in [1, FormatVersion]; body is md with any leading YAML
+// Ensures:  the returned Format is in [1, FormatVersion]; body is md with any leading YAML
 //
 //	block removed; it is pure.
-func readFormat(md string) (format int, body string, err error) {
+func readFrontmatter(md string) (frontmatterBlock, string, error) {
 	block, body := frontmatter.Split(md)
 	if strings.TrimSpace(block) == "" {
-		return 1, body, nil
+		return frontmatterBlock{Format: 1}, body, nil
 	}
-	var header struct {
-		Format int `yaml:"format"`
-	}
+	var header frontmatterBlock
 	if uerr := yaml.Unmarshal([]byte(block), &header); uerr != nil {
-		return 0, "", fmt.Errorf("ruleset: unreadable format header: %w", uerr)
+		return frontmatterBlock{}, "", fmt.Errorf("ruleset: unreadable frontmatter: %w", uerr)
 	}
 	switch {
 	case header.Format == 0:
 		// A block that declares no format is v1 with metadata, not a malformed version.
-		return 1, body, nil
+		header.Format = 1
 	case header.Format < 1:
-		return 0, "", fmt.Errorf("ruleset: format %d is not a version", header.Format)
+		return frontmatterBlock{}, "", fmt.Errorf(
+			"ruleset: format %d is not a version", header.Format)
 	case header.Format > FormatVersion:
-		return 0, "", fmt.Errorf(
+		return frontmatterBlock{}, "", fmt.Errorf(
 			"ruleset: format %d is newer than this parser understands (%d)",
 			header.Format, FormatVersion)
 	}
-	return header.Format, body, nil
+	return header, body, nil
 }
 
-// renderFormat emits the version block, and only above version 1.
-//
-// Silence at 1 is what keeps this change inert: every ruleset written before versioning
-// existed renders byte-identically, so the canonical-form round-trip check canonizer is
-// adding does not report drift on files nobody touched.
-//
-// Written by hand rather than marshalled. The canonical form's promise is byte-stability,
-// and a marshaller's key order, quoting and line endings are its choice rather than ours.
 // formatOf returns the lowest canonical-form version that can express rs.
 //
 // The version is derived from what the document uses rather than read from the field a
@@ -188,6 +238,11 @@ func readFormat(md string) (format int, body string, err error) {
 // v1 document rather than a malformed one, and never above what its content requires, which
 // is what keeps a corpus of warrant-free rulesets rendering byte-identically.
 func formatOf(rs *Ruleset) int {
+	// First, because the clauses below return early and run highest-version-first: a
+	// verified ruleset that declares no Limitations: must not fall through to 3.
+	if len(rs.Verified) > 0 {
+		return 4
+	}
 	if rs.Limitations != "" {
 		return 3
 	}
@@ -207,11 +262,31 @@ func formatOf(rs *Ruleset) int {
 	return 1
 }
 
-func renderFormat(format int) string {
+// renderFrontmatter emits the leading YAML block, and only above version 1.
+//
+// Silence at 1 is what keeps this change inert: every ruleset written before versioning
+// existed renders byte-identically, so the canonical-form round-trip check canonizer is
+// adding does not report drift on files nobody touched.
+//
+// Written by hand rather than marshalled. The canonical form's promise is byte-stability,
+// and a marshaller's key order, quoting and line endings are its choice rather than ours.
+func renderFrontmatter(format int, verified []verification.Event) string {
 	if format <= 1 {
 		return ""
 	}
-	return fmt.Sprintf("---\nformat: %d\n---\n", format)
+	var b strings.Builder
+	fmt.Fprintf(&b, "---\nformat: %d\n", format)
+	if len(verified) > 0 {
+		b.WriteString("verified:\n")
+		for i := range verified {
+			fmt.Fprintf(&b, "  - by: %q\n", verified[i].By)
+			if verified[i].At != "" {
+				fmt.Fprintf(&b, "    at: %q\n", verified[i].At)
+			}
+		}
+	}
+	b.WriteString("---\n")
+	return b.String()
 }
 
 // Render emits rs in the canonical text form. It is deterministic: the same
@@ -222,7 +297,7 @@ func renderFormat(format int) string {
 // the two agree on what a version-less ruleset is.
 func Render(rs *Ruleset) string {
 	var b strings.Builder
-	b.WriteString(renderFormat(formatOf(rs)))
+	b.WriteString(renderFrontmatter(formatOf(rs), rs.Verified))
 	fmt.Fprintf(&b, "Source: %s\n", rs.Source)
 	fmt.Fprintf(&b, "Scope:  %s\n", rs.Scope)
 	// Appended after the two headers every document already has, so a ruleset gaining
@@ -263,7 +338,7 @@ func Render(rs *Ruleset) string {
 // Parse reads the canonical form Render emits. A malformed rule header or an
 // unknown severity/level is an error, not a silent skip.
 func Parse(md string) (Ruleset, error) {
-	format, body, err := readFormat(md)
+	header, body, err := readFrontmatter(md)
 	if err != nil {
 		return Ruleset{}, err
 	}
@@ -272,7 +347,8 @@ func Parse(md string) (Ruleset, error) {
 		rs  Ruleset
 		cur *Rule
 	)
-	rs.Format = format
+	rs.Format = header.Format
+	rs.Verified = header.Verified
 	flush := func() {
 		if cur != nil {
 			rs.Rules = append(rs.Rules, *cur)
