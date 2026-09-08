@@ -101,14 +101,29 @@ func markers() []marker {
 // symbol** is an error rather than rationale, which is the whole point of the
 // function returning one.
 //
-// The rejection is deliberately narrow: only a leading rune in Unicode's *symbol*
-// categories, and only one that is not a known marker. It is not "any unknown
-// punctuation", because a rationale legitimately begins with an em dash, a curly
-// quotation mark, or a parenthesis, and rejecting those would reject prose somebody
-// will write. Every marker this form uses is a typographic symbol, chosen precisely
-// because prose does not begin that way — so "a rationale may not begin with a
-// symbol" is the constraint that makes the marker set extensible, and it is stated
-// here rather than discovered.
+// The rejection is deliberately narrow: only a leading rune in the two symbol categories
+// the markers themselves occupy — Unicode's So (other) and Sm (math) — and only one that is
+// not a known marker. It is not "any unknown punctuation", because a rationale legitimately
+// begins with an em dash, a curly quotation mark, or a parenthesis, and rejecting those
+// would reject prose somebody will write.
+//
+// **It was `unicode.IsSymbol` until 2026-09-07, and that was too wide by two categories.**
+// IsSymbol also spans Sk (modifier) and Sc (currency), which is where the backtick and the
+// currency signs live — so a rationale opening with a code span, “ `Error()` prints … “,
+// was rejected as an unrecognised marker, and `$HOME is read at startup` with it. Both are
+// exactly the "prose somebody will write" this comment already promised to permit; the
+// promise held only by accident, because every prose opener it names is *punctuation* and
+// so never met the test at all. Measured on the first real batch: 3 of 299 body lines began
+// with a backtick, and because one bad line fails a whole document they cost 2 of 8
+// rulesets.
+//
+// Every marker this form uses is So or Sm, chosen because prose does not begin that way.
+// TestEveryMarkerIsNonASCII asserts that, so a marker added in another category fails a
+// test rather than silently escaping this guard.
+//
+// What stays rejected: Sm also holds `<`, `+`, `=`, `~` and `|`, so a rationale opening
+// `<nil> is returned when …` is still a parse error. Narrower than before and not nothing;
+// widening further wants its own evidence rather than a guess.
 //
 // What this cannot catch is an ASCII marker added later. The answer is that the form
 // should not add one; TestEveryMarkerIsNonASCII makes that a checked claim rather
@@ -119,7 +134,7 @@ func applyBody(r *Rule, trimmed string) error {
 			return m.set(r, strings.TrimSpace(strings.TrimPrefix(trimmed, m.prefix)))
 		}
 	}
-	if first, _ := utf8.DecodeRuneInString(trimmed); unicode.IsSymbol(first) {
+	if first, _ := utf8.DecodeRuneInString(trimmed); markerLike(first) {
 		return fmt.Errorf(
 			"ruleset: unrecognised marker %q in %q; a rationale may not begin with a symbol",
 			string(first), trimmed)
@@ -130,6 +145,15 @@ func applyBody(r *Rule, trimmed string) error {
 		r.Rationale += " " + trimmed
 	}
 	return nil
+}
+
+// markerLike reports whether r is in one of the symbol categories the markers occupy.
+//
+// Named for what it tests rather than for unicode's spelling of it: the question applyBody
+// asks is "could this rune be a marker I do not know", and So/Sm is the answer to that
+// rather than a fact about Unicode worth restating at the call site.
+func markerLike(r rune) bool {
+	return unicode.Is(unicode.So, r) || unicode.Is(unicode.Sm, r)
 }
 
 // Present reports whether a warrant was recorded at all.
