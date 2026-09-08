@@ -13,13 +13,19 @@
 // to widen one or break the other, so the record is shared and the judgment is not. That
 // was decided 2026-09-07; see skillet's TODO.md, "OKF's trust fields".
 //
-// **It has no importers yet, and that is a sequencing fact rather than a want of one.**
-// gnosis (`internal/bundle`) and adh (`internal/contextstore`) each hand-wrote this type
-// before it was promoted, and both pin a released skillet, so neither can adopt it until
-// this ships. Both repositories' TODO.md record the swap as owed. That distinguishes it from
-// `skillet/provenance`, which was carried tested with zero importers and no consumer waiting
-// until v0.20.0 deleted it — if this package is still unimported after those two bump, it
-// has the same problem and the same remedy.
+// **Two importers, and a third consumer's slot now exists.** gnosis (`internal/bundle`) and
+// adh (`internal/contextstore`) each hand-wrote this type before it was promoted and both
+// import it today. That settles the comparison this paragraph used to carry: it read that if
+// the package were still unimported once those two bumped it would share
+// `skillet/provenance`'s fate, which was to be carried tested with zero importers and no
+// consumer waiting until v0.20.0 deleted it. They bumped, and it is not in that position.
+//
+// canonizer was the consumer that could not adopt it, because nothing it writes held a list
+// of these. `ruleset` version 4 gives it one — the `verified` key in a ruleset's frontmatter
+// block — chosen because both existing importers store events in the artifact the events are
+// about rather than in a side channel. canonizer still owes the write path, which needs adh's
+// actor policy: the actor comes from configured repository identity, never from a flag on the
+// invocation, since a caller-supplied actor lets anyone mint a `human:` event.
 package verification
 
 // Event is one verification: an actor and a declared time.
@@ -37,7 +43,12 @@ package verification
 // actor records nothing, while `at` is omitted when empty because a verification whose date
 // was never declared is still a verification. They come from adh's wire format, which
 // already persists this shape.
+//
+// The yaml tags carry the same asymmetry for `ruleset`'s frontmatter block. They are not
+// strictly required — the yaml decoder lowercases field names, so `By` and `At` would land
+// on `by` and `at` without them — and they are written so the wire format is something an
+// editor changes deliberately rather than a consequence of the Go field names.
 type Event struct {
-	By string `json:"by"`
-	At string `json:"at,omitempty"`
+	By string `json:"by"           yaml:"by"`
+	At string `json:"at,omitempty" yaml:"at,omitempty"`
 }

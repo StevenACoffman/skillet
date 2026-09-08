@@ -2904,8 +2904,43 @@ Source: canonizer went to adopt `verification.Event` for its `anchor-absent` spl
 the type available and no artifact able to hold one. Both items below are kernel questions
 that surfaced from a consumer; neither is canonizer's to answer, which is the point.
 
-- [ ] **No artifact carries verification events, so canonizer cannot adopt `Event` — and
-  the precedent for where they go is already set by both other consumers.** `Event` is a
+- [x] **No artifact carries verification events, so canonizer cannot adopt `Event` — and
+  the precedent for where they go is already set by both other consumers.**
+  **DONE 2026-09-08: `Ruleset.Verified []verification.Event`, read and written in the
+  frontmatter block, at format 4.**
+  **The bump had to clear `FormatVersion`'s own prohibition, and the doc was narrowed rather
+  than bent.** It read *"not to record provenance, tool identity or scoring metadata"* on the
+  ground that `identity.Hash` already pins provenance. That ground is true of tool identity
+  and false of a verification event: a hash says which bytes exist and cannot say who read
+  them and agreed. The sentence now forbids recording *what `identity.Hash` already
+  establishes*, which is what it argued for; the "second manifest" warning stands.
+  **Leaving the version at 3 was the alternative and it is worse.** An unmodelled `verified:`
+  parses without error and is dropped by `Render`, so an older tool would round-trip a
+  verified ruleset and lose a human's judgement with no error — the silent loss the block
+  exists to turn into a loud refusal.
+  **Proven inert on the corpus, not on a fixture.** All eight stored rulesets parse and
+  render byte-identically through released v0.32.0 and through this change — same SHA-256 for
+  each — because `formatOf` writes version 4 only for a document that uses it. canonizer,
+  the family's only ruleset parser, builds and passes with a temporary `replace` against
+  this tree; the `replace` was removed.
+  **Hand-written, not marshalled**, following the reason already recorded on the renderer:
+  byte-stability is the format's promise and a marshaller owns key order and quoting. Three
+  emission rules, each with a stated why — order preserved because the list is a history,
+  `at` omitted when empty to mirror `Event`'s json asymmetry, and `by`/`at` quoted
+  unconditionally so emission does not depend on the value. `%q` was checked through the
+  real decoder against seven adversarial actors, including `a"b`, `a\b`, `x: y`, an embedded
+  newline and the empty string.
+  **`readFormat` became `readFrontmatter`** — a function named for one key that returns two
+  tells a reader less than the code does — and its detached doc comment, which godoc never
+  associated with it, now sits above the function.
+  **Strict, with no bare-actor tolerance.** gnosis accepts a bare mapping or bare actor
+  because OKF §11 forbids rejecting a conformant document over an optional family's shape,
+  and it reads documents older than its reader. This key has no legacy population: version 4
+  invents it, so leniency would be special handling for a case that cannot occur.
+  **Still owed, and not by this repository:** canonizer needs a released skillet and then a
+  write path, and the write path needs adh's actor policy — actor from configured repository
+  identity, never from a flag. A slot existing does not give canonizer an actor.
+  Original entry: `Event` is a
   record, and nothing canonizer writes holds a list of them: rulesets carry no provenance
   metadata, `proof.Packet` is `{Arc, Provenance{GitSHA}, Artifacts}`, and `finding.Result` is
   `{Diagnostics, Unexamined}` where an envelope would change the format its consumers read.
@@ -2914,9 +2949,41 @@ that surfaced from a consumer; neither is canonizer's to answer, which is the po
   **document frontmatter** (`bundle.verifiedOf`, tolerating a bare mapping or bare actor per
   §11); adh **appends to the unit's own file** (`contextstore.RecordVerification`, decoding
   to raw messages and re-encoding so unmodelled fields survive). canonizer's artifact is the
-  ruleset, so the matching slot is **a `Verified:` header at format 4, beside
-  `Limitations:`** — not a field on `proof.Packet`, which was the other candidate here until
-  the precedent was checked.
+  ruleset, so the slot is on the ruleset — not a field on `proof.Packet`, which was the other
+  candidate here until the precedent was checked.
+  **DECIDED 2026-09-08: the ruleset's YAML frontmatter block, modelled, at format 4 — not a
+  `Verified:` body header.** This entry proposed the body header, and between the two
+  ruleset placements it picked the one that fights the data.
+  **`Source:`, `Scope:` and `Limitations:` are each one string; `Verified` is a list of
+  records.** Putting `[{by, at}, ...]` on a single header line needs an invented delimiter
+  grammar, which is the kind of thing this format has refused everywhere else. The
+  frontmatter block already exists, and YAML expresses a list of records natively.
+  **It is also the closer match to the precedent this entry cites.** gnosis reads events from
+  *frontmatter*, not from a body header, so "do what gnosis does" argues for the block.
+  **And it puts machine-maintained metadata out of reach of the agent that writes the body.**
+  Rulesets are agent-authored; a body header an agent must preserve while rewriting rules
+  will drift, and would need its own prompt checklist item. The frontmatter block is written
+  by tools only.
+  **MEASURED 2026-09-08: an unmodelled `verified:` key parses without error and is silently
+  dropped by Render.** So a convention-only approach — write the key, leave the kernel alone
+  — is actively destructive here: canonizer's `Canonical` compares stored bytes against the
+  rendering, so every verified ruleset would report `non-canonical` and the next
+  normalisation would erase the events. adh survives convention because it decodes to
+  `json.RawMessage` and re-encodes; this format rebuilds from the struct. **Whatever slot
+  wins must be modelled**, which is why this is a kernel change and not a canonizer one.
+  **The format-4 cost is far smaller than a version bump usually is.** `canonizer` is the
+  **only** ruleset parser in the family — eight files calling `Parse`/`Render`; gnosis, adh,
+  exegesis and skillsaw call neither — and all five repositories already pin v0.32.0. A v3
+  parser rejects a v4 file outright rather than ignoring one field, so the hard gate is real,
+  but it has one reader and that reader moves with the kernel. `formatOf` derives the version
+  from content, so a ruleset carrying no events still renders as 3 and the eight existing
+  files stay byte-identical.
+  **Carry over the one good idea from the `proof.Packet` option.** A packet binds ruleset and
+  source bytes through `identity.Hash`, so an event recorded there is scoped to the exact
+  bytes verified; an event on a mutable document attests to a version that may already have
+  changed. The record should therefore be able to say *what* it attests to, or drift makes it
+  misleading rather than merely stale. Not necessarily a field on `Event` — that type is
+  deliberately two strings — but the slot's design should not foreclose it.
   It is also the only option that satisfies the canonizer entry's *own* stated trigger,
   *"if rulesets ever carry provenance metadata"*, which a proof-packet field would leave
   unmet.
