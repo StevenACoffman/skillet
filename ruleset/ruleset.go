@@ -268,8 +268,35 @@ func formatOf(rs *Ruleset) int {
 // existed renders byte-identically, so the canonical-form round-trip check canonizer is
 // adding does not report drift on files nobody touched.
 //
-// Written by hand rather than marshalled. The canonical form's promise is byte-stability,
-// and a marshaller's key order, quoting and line endings are its choice rather than ours.
+// **Written by hand rather than marshalled, and the alternative was measured before this
+// said so.** yaml.Marshal of the same struct works: it is deterministic within a version
+// (one rendering over 200 calls), omitempty gives the inert property above for free, and it
+// round-trips every input tried, including an actor holding a "---" line -- a block scalar
+// indents its content and frontmatter.Split only terminates on a line *starting* with the
+// delimiter, so neither form can be fooled by that.
+//
+// It was still declined, because a marshaller quotes **minimally and by value**. Measured
+// against goccy: `human:steve` and `a"b` emit bare, `a\b` emits quoted, and an embedded
+// newline is promoted to a multi-line block scalar -- so the file's shape becomes a function
+// of the data, and the anchor for Render's byte-identical promise moves from this source
+// into a dependency's version. An emitter's stylistic choices are the likeliest thing to
+// shift across an upgrade.
+//
+// **The deciding argument is which failure is worse.** Hand-writing cannot drift on the
+// write side at all, and its failure mode is a malformed value that Parse rejects loudly.
+// A marshaller's failure mode is an upgrade silently re-rendering every stored ruleset:
+// Canonical reports non-canonical at error severity, so a whole corpus turns blocking, and
+// canonizer's --sign-off would then refuse every ruleset for a reason belonging to none of
+// them. Both approaches need exactly one guarding test, so that is a wash; loud beats silent.
+//
+// This pins only the write side. The block is read by the same marshaller either way, so the
+// dependency is reduced to its more stable half rather than removed -- a reader must accept
+// all valid YAML, while an emitter chooses among valid renderings.
+//
+// **So TestAVerifiedRulesetRoundTripsThroughBothDirections is load-bearing, not coverage.**
+// Writer and reader here are different mechanisms, and that test -- rendering, parsing the
+// rendering, and rendering again over adversarial actors -- is the only thing standing
+// between them. Do not thin it out.
 func renderFrontmatter(format int, verified []verification.Event) string {
 	if format <= 1 {
 		return ""
