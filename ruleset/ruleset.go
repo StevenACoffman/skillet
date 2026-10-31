@@ -362,8 +362,9 @@ func Render(rs *Ruleset) string {
 	return b.String()
 }
 
-// Parse reads the canonical form Render emits. A malformed rule header or an
-// unknown severity/level is an error, not a silent skip.
+// Parse reads the canonical form Render emits. A malformed rule header, an
+// unknown severity/level, or a second ✗, ✓, ↦ or ⚖ line on one rule is an error,
+// not a silent skip.
 func Parse(md string) (Ruleset, error) {
 	header, body, err := readFrontmatter(md)
 	if err != nil {

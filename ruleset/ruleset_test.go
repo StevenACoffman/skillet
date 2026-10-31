@@ -182,3 +182,59 @@ func TestEveryMarkerIsNonASCII(t *testing.T) {
 		}
 	}
 }
+
+// TestASingleValueMarkerMayNotRepeat pins the refusal that keeps a round trip lossless.
+// A second ✗, ✓, ↦ or ⚖ line used to overwrite the first, and Render then emitted only
+// the survivor, so canonizer's fmt deleted example pairs from a stored ruleset.
+func TestASingleValueMarkerMayNotRepeat(t *testing.T) {
+	t.Parallel()
+	const header = "§2.3  [MUST][CODE]  Close all rows\n  because leaks are silent\n"
+	cases := map[string]struct {
+		body   string
+		marker string // the repeated marker the error must name
+	}{
+		"two ✗ lines": {
+			"  ✗  rows never closed\n  ✓  defer rows.Close()\n  ✗  rows closed late\n", "✗",
+		},
+		"two ✓ lines": {
+			"  ✗  rows never closed\n  ✓  defer rows.Close()\n  ✓  rows.Close() on return\n", "✓",
+		},
+		"two ↦ lines": {
+			"  ↦  \"close the rows\"\n  ↦  \"always close\"\n", "↦",
+		},
+		"two ⚖ lines": {
+			"  ⚖  steve 2026-08-27  two MUSTs disagreed\n" +
+				"  ⚖  steve 2026-08-28  decided again\n", "⚖",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := ruleset.Parse("Source: x\n\n" + header + tc.body)
+			if err == nil {
+				t.Fatalf("got no error, want one naming the repeated %s", tc.marker)
+			}
+			for _, want := range []string{"§2.3", "more than one " + tc.marker + " line"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not name %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+// TestACheckMayRepeat is the other half of the refusal above: ⊨ is a list, one line per
+// check, so refusing repeats must not reach it.
+func TestACheckMayRepeat(t *testing.T) {
+	t.Parallel()
+	rs, err := ruleset.Parse("Source: x\n\n" +
+		"§2.3  [MUST][CODE]  Close all rows\n  because leaks are silent\n" +
+		"  ✗  rows never closed\n  ✓  defer rows.Close()\n" +
+		"  ⊨  contains  never\n  ⊨  contains  rows\n")
+	if err != nil {
+		t.Fatalf("got error %v, want none", err)
+	}
+	if got := len(rs.Rules[0].Checks); got != 2 {
+		t.Errorf("len(Checks) = %d, want 2", got)
+	}
+}

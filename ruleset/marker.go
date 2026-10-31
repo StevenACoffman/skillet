@@ -52,10 +52,9 @@ type Warrant struct {
 
 // marker is one body-line prefix and the field it fills.
 //
-// set returns an error because one marker's value can be malformed: a warrant carries three
-// things and a partial one is worse than none. The three single-value markers cannot fail
-// and return nil, which is cheaper than a second table for the one that can -- a
-// special-purpose branch inside a general mechanism is the shape this form avoids.
+// set returns an error because a marker's line can be refused: a warrant carries three
+// things and a partial one is worse than none, and a single-value marker may appear only
+// once on a rule (see markers).
 type marker struct {
 	prefix string
 	set    func(*Rule, string) error
@@ -66,12 +65,23 @@ type marker struct {
 // One place because there are two readers: applyBody, and the test asserting that
 // FormatVersion was bumped when the set changed. A marker added to a switch and not
 // to a list is the second-place-to-remember problem; a marker added here is counted.
+//
+// **✗, ✓, ↦ and ⚖ hold one value each, and a second line is refused rather than kept.**
+// Until 2026-10-31 a second line overwrote the first, and Render emitted only the survivor,
+// so a rule written with two ✗/✓ pairs lost one on its first round trip -- canonizer's
+// fmt deleted four pairs that way from one ruleset, and its verify had only ever checked
+// the survivors. Refusing is the fix rather than keeping both, because a rule's pair is
+// the one case it must flag and the one it must not: two pairs is two rules, or one pair
+// whose lines name both cases. Neither is this parser's to choose.
 func markers() []marker {
 	return []marker{
-		{"✗", func(r *Rule, v string) error { r.Bad = v; return nil }},
-		{"✓", func(r *Rule, v string) error { r.Good = v; return nil }},
-		{"↦", func(r *Rule, v string) error { r.SourceAnchor = v; return nil }},
+		{"✗", func(r *Rule, v string) error { return setOnce(r, &r.Bad, "✗", v) }},
+		{"✓", func(r *Rule, v string) error { return setOnce(r, &r.Good, "✓", v) }},
+		{"↦", func(r *Rule, v string) error { return setOnce(r, &r.SourceAnchor, "↦", v) }},
 		{"⚖", func(r *Rule, v string) error {
+			if r.Warrant.Present() {
+				return repeatedMarker(r, "⚖")
+			}
 			w, err := parseWarrant(v)
 			if err != nil {
 				return err
@@ -93,10 +103,31 @@ func markers() []marker {
 	}
 }
 
+// setOnce stores a single-value marker's text, refusing a second line for the same field.
+//
+// It tests the field rather than a record of which markers were seen, so a first line with
+// no text after its marker does not count as set. That gap is accepted: an empty ✗ or ✓
+// leaves the rule without a pair, which a consumer already reports as unexecutable.
+func setOnce(r *Rule, dst *string, prefix, v string) error {
+	if *dst != "" {
+		return repeatedMarker(r, prefix)
+	}
+	*dst = v
+	return nil
+}
+
+// repeatedMarker is the error for a second line of a single-value marker on one rule.
+func repeatedMarker(r *Rule, prefix string) error {
+	return fmt.Errorf(
+		"ruleset: §%s has more than one %s line; a rule holds one, so join the lines "+
+			"into one or split the rule", r.Section, prefix)
+}
+
 // applyBody attaches one body line to a rule, or reports a line it cannot place.
 //
 // Requires: trimmed is non-empty and has no surrounding space.
-// Ensures: a line opening with a known marker sets that field; any other line is
+// Ensures: a line opening with a known marker sets that field, or appends to the checks
+// for ⊨, and a second line for a single-value marker is an error; any other line is
 // rationale, first line or continuation. A line opening with an **unrecognised
 // symbol** is an error rather than rationale, which is the whole point of the
 // function returning one.
