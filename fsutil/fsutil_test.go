@@ -33,10 +33,11 @@ func TestSubdirsContaining(t *testing.T) {
 		"top.txt":        {Data: []byte("x")}, // top-level file, not a dir
 		"d/sub/SKILL.md": {Data: []byte("x")}, // marker is nested, not direct
 	}
-	got, err := fsutil.SubdirsContaining(fsys, ".", "SKILL.md")
+	found, err := fsutil.SubdirsContaining(fsys, ".", "SKILL.md")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	got := found.Dirs
 	want := []string{"a", "b"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("SubdirsContaining = %v, want %v", got, want)
@@ -46,10 +47,11 @@ func TestSubdirsContaining(t *testing.T) {
 func TestSubdirsContainingNoMatches(t *testing.T) {
 	t.Parallel()
 	fsys := fstest.MapFS{"only/notes.txt": {Data: []byte("x")}}
-	got, err := fsutil.SubdirsContaining(fsys, ".", "SKILL.md")
+	found, err := fsutil.SubdirsContaining(fsys, ".", "SKILL.md")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	got := found.Dirs
 	if len(got) != 0 {
 		t.Fatalf("want no matches, got %v", got)
 	}
@@ -75,10 +77,11 @@ func TestSubdirsContainingAnyDedupAndSkip(t *testing.T) {
 	}
 	// The first root is repeated (dedup) and a nonexistent root is included (skip).
 	roots := []string{".claude/skills", ".cursor/skills", ".claude/skills", "missing/root"}
-	got, err := fsutil.SubdirsContainingAny(fsys, roots, "SKILL.md")
+	found, err := fsutil.SubdirsContainingAny(fsys, roots, "SKILL.md")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	got := found.Dirs
 	want := []string{".claude/skills/alpha", ".cursor/skills/beta"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("SubdirsContainingAny = %v, want %v", got, want)
