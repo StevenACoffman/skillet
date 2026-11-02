@@ -23,14 +23,21 @@ package textnorm
 import (
 	"regexp"
 	"strings"
+
+	"github.com/StevenACoffman/skillet/hidden"
 )
 
 // reSpace matches any run of whitespace, including the newlines a quotation is wrapped
 // across in Markdown but not in an extracted source text.
 var reSpace = regexp.MustCompile(`\s+`)
 
-// Fold reduces text to the form two copies of it are compared in: whitespace runs
-// collapsed to one space, typographic characters folded to ASCII, ends trimmed.
+// Fold reduces text to the form two copies of it are compared in: invisible codepoints
+// removed, whitespace runs collapsed to one space, typographic characters folded to
+// ASCII, ends trimmed.
+//
+// "Invisible" is whatever hidden.Classify lists, so this and the hidden-character scan
+// agree on what a reader cannot see. Folding removed only U+200B before, so a quotation
+// carrying a soft hyphen was rejected by the scan yet compared as different text here.
 //
 // It deliberately does not change case. Case can carry meaning in a quotation, and the
 // caller that wants case-insensitivity can say so; a folder that quietly lower-cased
@@ -38,15 +45,16 @@ var reSpace = regexp.MustCompile(`\s+`)
 //
 // Ensures: Fold(Fold(s)) == Fold(s); it is pure.
 func Fold(s string) string {
-	return strings.TrimSpace(reSpace.ReplaceAllString(typographic().Replace(s), " "))
+	visible := hidden.Strip(s).Text
+	return strings.TrimSpace(reSpace.ReplaceAllString(typographic().Replace(visible), " "))
 }
 
 // typographic folds the characters a book and its plain-text extraction are most likely
 // to disagree about. A guard that fired on every curly apostrophe would not get run.
 //
-// The two space-like entries are written as escapes on purpose: a literal non-breaking
-// or zero-width space in source is invisible, so a later reader could neither tell what
-// the entry does nor notice if it were silently edited away.
+// The non-breaking space is written as an escape on purpose: a literal one in source is
+// invisible, so a later reader could neither tell what the entry does nor notice if it
+// were silently edited away. Zero-width characters are not here; Fold strips them first.
 //
 // Built per call rather than kept in a package variable: it is microseconds against
 // reading whole books off disk, and a package-level Replacer is shared state.
@@ -57,6 +65,5 @@ func typographic() *strings.Replacer {
 		"\u2013", "-", "\u2014", "-", // en and em dash
 		"\u2026", "...", // ellipsis
 		"\u00a0", " ", // non-breaking space
-		"\u200b", "", // zero-width space
 	)
 }

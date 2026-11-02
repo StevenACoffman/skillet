@@ -13,16 +13,18 @@ func TestFold(t *testing.T) {
 	// notice it being edited away. staticcheck proposed exactly that edit here -- one of its
 	// two conflicting fixes rewrote the case to {"ab", "ab"}, which passes and tests nothing.
 	cases := map[string]struct{ in, want string }{
-		"whitespace runs collapse":  {"a   b\n\tc", "a b c"},
-		"leading and trailing go":   {"  a b  ", "a b"},
-		"curly single quote":        {"don\u2019t", "don't"},
-		"curly double quotes":       {"\u201cq\u201d", `"q"`},
-		"en and em dash":            {"a\u2013b\u2014c", "a-b-c"},
-		"ellipsis expands":          {"a\u2026", "a..."},
-		"non-breaking space folds":  {"a\u00a0b", "a b"},
-		"zero-width space vanishes": {"a\u200bb", "ab"},
-		"already folded is a no-op": {"a b c", "a b c"},
-		"empty":                     {"", ""},
+		"whitespace runs collapse":                         {"a   b\n\tc", "a b c"},
+		"leading and trailing go":                          {"  a b  ", "a b"},
+		"curly single quote":                               {"don\u2019t", "don't"},
+		"curly double quotes":                              {"\u201cq\u201d", `"q"`},
+		"en and em dash":                                   {"a\u2013b\u2014c", "a-b-c"},
+		"ellipsis expands":                                 {"a\u2026", "a..."},
+		"non-breaking space folds":                         {"a\u00a0b", "a b"},
+		"zero-width space vanishes":                        {"a\u200bb", "ab"},
+		"soft hyphen vanishes, as the hidden scan sees it": {"ig\u00adnore", "ignore"},
+		"word joiner vanishes":                             {"a\u2060b", "ab"},
+		"already folded is a no-op":                        {"a b c", "a b c"},
+		"empty":                                            {"", ""},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
