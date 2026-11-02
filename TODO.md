@@ -3127,3 +3127,38 @@ a rationale may not begin with a symbol
   identifier"* to its distill prompt, to stop `Specificity` measuring typography. That fix
   is right and it raised the rate of rationales opening with a code span. Two correct
   changes, one latent parser bug between them.
+
+## Kernel Half of the `stbenjam` and Agent Plugins Review (2026-11-02)
+
+Recommendations K1–K8 of `agent-orange/write/stbenjam_improvements.md`, taken in this
+order. Each consumer's half is filed in its own repository.
+
+- [x] **K3** `frontmatter.Split` drops a leading U+FEFF; `Raw` and `Hash` stay byte-exact.
+- [x] **K8** `.pi/skills` in `skill.DefaultRoots`.
+- [x] **K7** `manifest.Format` (`skills-manifest/1`), written by `Build`. `Parse` reads an
+  absent format as the current layout and rejects any other.
+- [x] **K2** `speclint` holds the whole spec name rule (length, charset, hyphens, folder
+  match), field types, and the `compatibility` cap. Unknown keys are warnings (D2), naming
+  Claude Code's documented extensions as such; descriptions over 300 runes warn (D6);
+  the `anthropic`/`claude` reserved words warn as an Anthropic platform rule.
+  `ValidSkillName` is a skill-name predicate only — plugin names allow `.`.
+- [x] **K1** `hidden`: one scan with stbenjam's context rules (joiners only next to ASCII
+  or another listed codepoint; the England, Scotland and Wales flags exempt; a byte-order
+  mark only at offset 0) and its wider codepoint set. `ByClass` is gnosis's view, `Strip`
+  plus `Original` is the folded copy G2 matches on, and `textnorm.Fold` strips the same set.
+- [x] **K4** `neutrality.DynamicContext`: inline `` !`cmd` `` outside example fences and
+  `` ```! `` fences. Measured on the market: 69 commands in 22 skills, as F23 counted.
+- [x] **K5** `skill.BrokenLinks` over `markdown.Doc.LinkDestinations` (links and images,
+  not code spans). Market: 0 broken links in 217 skills.
+- [x] **K6** `skill.DiscoverTree` is contained in the tree with `os.Root`, resolves in-tree
+  links with `fs.Stat`, and returns `Skipped` entries with reasons. `DiscoverRoots` is
+  contained in its base, because `npx skills` links `.claude/skills/<n>` to
+  `.agents/skills/<n>`. Absolute link targets are always skipped (os.Root's rule).
+- [x] `speclint.SkillMaxLines` (500) and `speclint.Lines`, at skillsaw's request: exegesis E5
+  and skillsaw S1/S5 each held the figure and a counter, which is the same design decision in
+  two modules. skillsaw now uses these; its own constant and counter are deleted.
+
+**Breaking for consumers:** `skill.DiscoverRoots` and `fsutil.SubdirsContaining{,Any}`
+return result structs; `speclint.Frontmatter` now returns warnings beside errors, so a
+caller treating every diagnostic as blocking must filter on `Severity.Blocking()`;
+exegesis's own name/folder check now duplicates speclint's and should be deleted.
