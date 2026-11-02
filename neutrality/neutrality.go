@@ -16,6 +16,12 @@ import (
 // no global state; Scan compiles it once per call.
 const redLightPattern = `(在 Claude Code|Claude Code skill|Claude Code 用户|Cursor only|Codex 中|^\[!\[Claude Code|~/\.claude/skills/[a-z]|/plugin install\b)`
 
+// dynamicInlinePattern matches Claude Code's inline dynamic-context syntax: an
+// exclamation mark, then a code span holding a command. The mark must not itself sit
+// inside a code span, which is how prose writes about a literal "!" (for example
+// "prefix `!` to negate"). It is applied per line.
+const dynamicInlinePattern = "(^|[^`])!`[^`]+`"
+
 // Hit is one red-light match.
 type Hit struct {
 	File string `json:"file"`
@@ -45,4 +51,50 @@ func Scan(files []NamedFile) []Hit {
 		}
 	}
 	return hits
+}
+
+// DynamicContext reports Claude Code's dynamic-context syntax, which binds a skill to
+// that runtime in a way Scan's wording check cannot see: Claude Code runs the command
+// before the model reads the skill, and every other client shows the raw text. Two
+// forms are reported, each at the line it starts on:
+//
+//   - an inline "!" immediately followed by a code span, outside any fenced block;
+//   - a fenced block whose info string starts with "!".
+//
+// An ordinary fenced block is example code, and an inline form written inside one is a
+// skill documenting the syntax rather than using it, so it is skipped.
+//
+// Requires: nothing.
+// Ensures:  hits follow file order, then line order; it is pure. CRLF is normalized.
+func DynamicContext(files []NamedFile) []Hit {
+	inline := regexp.MustCompile(dynamicInlinePattern)
+	var hits []Hit
+	for _, f := range files {
+		inFence := false
+		lines := strings.Split(strings.ReplaceAll(f.Content, "\r\n", "\n"), "\n")
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if fence, info := fenceLine(trimmed); fence {
+				if !inFence && strings.HasPrefix(info, "!") {
+					hits = append(hits, Hit{File: f.Name, Line: i + 1, Text: trimmed})
+				}
+				inFence = !inFence
+				continue
+			}
+			if !inFence && inline.MatchString(line) {
+				hits = append(hits, Hit{File: f.Name, Line: i + 1, Text: trimmed})
+			}
+		}
+	}
+	return hits
+}
+
+// fenceLine reports whether trimmed opens or closes a fenced block, and its info string.
+func fenceLine(trimmed string) (bool, string) {
+	for _, marker := range []string{"```", "~~~"} {
+		if strings.HasPrefix(trimmed, marker) {
+			return true, strings.TrimSpace(strings.TrimLeft(trimmed, marker[:1]))
+		}
+	}
+	return false, ""
 }

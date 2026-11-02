@@ -110,14 +110,17 @@ func TestDiscoverRoots(t *testing.T) {
 	base := t.TempDir()
 	writeSkill(t, filepath.Join(base, ".claude", "skills"), "alpha", sampleSkill)
 	writeSkill(t, filepath.Join(base, ".cursor", "skills"), "beta", sampleSkill)
+	writeSkill(t, filepath.Join(base, ".pi", "skills"), "gamma", sampleSkill)
 	// .codex/skills and .agents/skills are absent and must be skipped.
-	got, err := skill.DiscoverRoots(base, skill.DefaultRoots())
+	found, err := skill.DiscoverRoots(base, skill.DefaultRoots())
 	if err != nil {
 		t.Fatalf("DiscoverRoots: %v", err)
 	}
+	got := found.Dirs
 	want := []string{
 		filepath.Join(base, ".claude", "skills", "alpha"),
 		filepath.Join(base, ".cursor", "skills", "beta"),
+		filepath.Join(base, ".pi", "skills", "gamma"),
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("DiscoverRoots = %v, want %v", got, want)
@@ -244,5 +247,117 @@ func TestParseReadsACRLFSkill(t *testing.T) {
 	}
 	if strings.Contains(s.Body, "---") {
 		t.Errorf("delimiter leaked into the body: %q", s.Body)
+	}
+}
+
+func TestParseReadsAByteOrderMarkedSkill(t *testing.T) {
+	t.Parallel()
+	// "UTF-8 with BOM" puts U+FEFF before the opening delimiter. The header must still be
+	// read, and Raw must keep the mark: the hash is over the bytes on disk.
+	dir := t.TempDir()
+	raw := "\ufeff---\nname: alpha\ndescription: Use when x.\n---\nbody\n"
+	if err := os.WriteFile(filepath.Join(dir, skill.FileName), []byte(raw), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := skill.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Name != "alpha" || s.Description != "Use when x." {
+		t.Errorf("got name=%q description=%q, want them read past the byte-order mark",
+			s.Name, s.Description)
+	}
+	if s.Raw != raw {
+		t.Errorf("Raw lost the byte-order mark: %q", s.Raw)
+	}
+	if got, want := s.Hash(), identity.Hash(raw); got != want {
+		t.Errorf("Hash = %q, want %q — identity over the raw bytes", got, want)
+	}
+}
+
+func TestDiscoverTreeIsContained(t *testing.T) {
+	t.Parallel()
+	// The three shapes from the Agent Plugins review (F31): a link inside the tree must
+	// resolve, and a directory link or a SKILL.md link that leaves the tree must be
+	// reported, never followed and never dropped.
+	outside := t.TempDir()
+	writeSkill(t, outside, "elsewhere", sampleSkill)
+	writeSkill(t, outside, "target", sampleSkill)
+
+	tree := t.TempDir()
+	writeSkill(t, tree, "real", sampleSkill)
+	symlink(t, "real", filepath.Join(tree, "linked")) // relative, as installers write them
+	symlink(t, filepath.Join(outside, "elsewhere"), filepath.Join(tree, "escaping-dir"))
+	if err := os.MkdirAll(filepath.Join(tree, "escaping-file"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	symlink(t, filepath.Join(outside, "target", skill.FileName),
+		filepath.Join(tree, "escaping-file", skill.FileName))
+
+	d, err := skill.DiscoverTree(tree)
+	if err != nil {
+		t.Fatalf("DiscoverTree: %v", err)
+	}
+	wantDirs := []string{filepath.Join(tree, "linked"), filepath.Join(tree, "real")}
+	if !reflect.DeepEqual(d.Dirs, wantDirs) {
+		t.Errorf("Dirs = %v, want %v", d.Dirs, wantDirs)
+	}
+	var skipped []string
+	for _, s := range d.Skipped {
+		skipped = append(skipped, s.Path)
+		if s.Reason == "" {
+			t.Errorf("skip of %s carries no reason", s.Path)
+		}
+	}
+	wantSkipped := []string{
+		filepath.Join(tree, "escaping-dir"),
+		filepath.Join(tree, "escaping-file", skill.FileName),
+	}
+	if !reflect.DeepEqual(skipped, wantSkipped) {
+		t.Errorf("Skipped = %v, want %v", skipped, wantSkipped)
+	}
+
+	// Discover acts on the same contained set.
+	dirs, err := skill.Discover(tree)
+	if err != nil || !reflect.DeepEqual(dirs, wantDirs) {
+		t.Errorf("Discover = %v, %v; want %v", dirs, err, wantDirs)
+	}
+}
+
+func TestDiscoverRootsFollowsLinksBetweenRoots(t *testing.T) {
+	t.Parallel()
+	// `npx skills` installs into .agents/skills and links .claude/skills/<name> to it.
+	// The link leaves its root but not the base, and the harness follows it.
+	base := t.TempDir()
+	writeSkill(t, filepath.Join(base, ".agents", "skills"), "shared", sampleSkill)
+	if err := os.MkdirAll(filepath.Join(base, ".claude", "skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	symlink(t, filepath.Join("..", "..", ".agents", "skills", "shared"),
+		filepath.Join(base, ".claude", "skills", "shared"))
+
+	d, err := skill.DiscoverRoots(base, []string{".claude/skills"})
+	if err != nil {
+		t.Fatalf("DiscoverRoots: %v", err)
+	}
+	want := []string{filepath.Join(base, ".claude", "skills", "shared")}
+	if !reflect.DeepEqual(d.Dirs, want) || len(d.Skipped) != 0 {
+		t.Errorf("Discovery = %+v, want Dirs %v and no skips", d, want)
+	}
+}
+
+func TestDiscoverTreeMissingIsAnError(t *testing.T) {
+	t.Parallel()
+	if _, err := skill.DiscoverTree(filepath.Join(t.TempDir(), "nope")); err == nil {
+		t.Error("DiscoverTree accepted a tree that does not exist")
+	}
+}
+
+// symlink creates newname pointing at oldname, skipping the test where links are not
+// supported.
+func symlink(t *testing.T, oldname, newname string) {
+	t.Helper()
+	if err := os.Symlink(oldname, newname); err != nil {
+		t.Skipf("symlinks unsupported: %v", err)
 	}
 }

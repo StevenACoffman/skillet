@@ -2,7 +2,7 @@
 
 **A Go toolkit for turning prose expertise into verifiable, runtime-neutral Agent Skills.**
 
-`skillet` is the shared kernel behind a family of tools. 
+`skillet` is the shared kernel behind a family of tools.
 
 **`skillet`** (Go library): The unified domain core. Holds common definitions, `speclint` frontmatter schemas, `redlines` quality rules, `skilllens` detectors, `testprompts`, `ratchet`, and `calibration` metrics. Ensures all downstream consumers have a single source of truth. For example, when two of them parse the same `SKILL.md`, hash the same artifact, or fold the same quotation, they must reach byte-identical answers. `skillet` provides that logic once, so the tools never drift apart.
 
@@ -97,18 +97,19 @@ Each package does one job and depends on little. Take only what you need.
 
 ### Skills and Markdown
 
-| Package       | Purpose                                                                                                                                                                                                                       |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `skill`       | Load and parse Agent Skills (`SKILL.md`): frontmatter plus Markdown body.                                                                                                                                                     |
-| `markdown`    | Structured view of a skill body via goldmark (headings, fences, lists, tables).                                                                                                                                               |
-| `speclint`    | Validate `SKILL.md` frontmatter against the agentskills.io spec (description cap, allowed keys). The single source of truth for the spec's drift-prone data.                                                                  |
-| `neutrality`  | Red-light scan that flags runtime-binding wording, so a skill installs in any runtime.                                                                                                                                        |
-| `frontmatter` | Split a leading `---` YAML block from the Markdown body. Normalizes CRLF, so a caller that forgets to cannot get an empty header instead of an error.                                                                         |
-| `redlines`    | book2skill's mechanical Quality Red Lines: the six RIA-TV++ segments, the per-quotation word ceiling, and a description that states its trigger.                                                                              |
-| `skilllens`   | The three SkillLens quality detectors — failure mechanisms, softening phrases, blacklist sections — returning located evidence rather than diagnostics, so each consumer sets its own severity.                               |
-| `timeseries`  | Detect a regression against a rolling baseline rather than a fixed threshold.                                                                                                                                                 |
-| `textnorm`    | Fold the differences between two copies of the same words that nobody means as differences: whitespace runs and typographic characters. The single normalizer, so no two guards disagree about what counts as the same words. |
-| `quotecheck`  | The fabrication guard: given quotations and the texts they claim to come from, report which cannot be found. Three outcomes — found, missing, and **unchecked**, because "nobody looked" is not the claim "this is fine".     |
+| Package       | Purpose                                                                                                                                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `skill`       | Load and parse Agent Skills (`SKILL.md`): frontmatter plus Markdown body. Discovery is contained in the tree (`os.Root`) and reports entries it could not read; `BrokenLinks` is the shared broken-link check.                  |
+| `markdown`    | Structured view of a skill body via goldmark (headings, fences, lists, tables).                                                                                                                                                 |
+| `speclint`    | Validate `SKILL.md` frontmatter against the agentskills.io spec (name rules, length caps, field types, allowed keys; unknown keys and long descriptions warn). The single source of truth for the spec's drift-prone data.      |
+| `neutrality`  | Red-light scan that flags runtime-binding wording, so a skill installs in any runtime; `DynamicContext` finds Claude Code's `` !`cmd` `` syntax.                                                                                |
+| `frontmatter` | Split a leading `---` YAML block from the Markdown body. Drops a leading byte-order mark and normalizes CRLF, so a caller that forgets to cannot get an empty header instead of an error.                                       |
+| `redlines`    | book2skill's mechanical Quality Red Lines: the six RIA-TV++ segments, the per-quotation word ceiling, and a description that states its trigger.                                                                                |
+| `skilllens`   | The three SkillLens quality detectors — failure mechanisms, softening phrases, blacklist sections — returning located evidence rather than diagnostics, so each consumer sets its own severity.                                 |
+| `timeseries`  | Detect a regression against a rolling baseline rather than a fixed threshold.                                                                                                                                                   |
+| `hidden`      | The one hidden-character scan: zero-width, bidirectional and tag codepoints, with the exact context rules (joiners, three flag emoji, a leading byte-order mark). `Strip` removes them with an offset map back to the original. |
+| `textnorm`    | Fold the differences between two copies of the same words that nobody means as differences: whitespace runs and typographic characters. The single normalizer, so no two guards disagree about what counts as the same words.   |
+| `quotecheck`  | The fabrication guard: given quotations and the texts they claim to come from, report which cannot be found. Three outcomes — found, missing, and **unchecked**, because "nobody looked" is not the claim "this is fine".       |
 
 ### Rulesets and the Distillation Pipeline
 
@@ -141,11 +142,11 @@ Each package does one job and depends on little. Take only what you need.
 
 ### Foundations
 
-| Package      | Purpose                                                                  |
-| ------------ | ------------------------------------------------------------------------ |
-| `errs`       | Error-code vocabulary, and the bridge that reads it off a toerr error.   |
-| `atomicfile` | Atomic file writes: a crash never leaves a half-written file.            |
-| `fsutil`     | Small `fs.FS`-shaped filesystem helpers.                                 |
+| Package      | Purpose                                                                |
+| ------------ | ---------------------------------------------------------------------- |
+| `errs`       | Error-code vocabulary, and the bridge that reads it off a toerr error. |
+| `atomicfile` | Atomic file writes: a crash never leaves a half-written file.          |
+| `fsutil`     | Small `fs.FS`-shaped filesystem helpers.                               |
 
 See [`skillet.modelith.md`](./skillet.modelith.md) for the full domain model.
 

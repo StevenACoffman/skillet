@@ -11,60 +11,83 @@ import (
 	"path"
 )
 
-// SubdirsContaining returns the immediate subdirectories of dir (within fsys)
-// that directly contain a file named marker, as slash paths joined onto dir.
-// The result is sorted by name, because fs.ReadDir returns entries in order.
-//
-// It returns an error if dir cannot be read. Pass "." for the root of fsys.
-// This is the single-tree discovery shape (a marker file in each candidate
-// child of one parent directory).
-func SubdirsContaining(fsys fs.FS, dir, marker string) ([]string, error) {
-	entries, err := fs.ReadDir(fsys, dir)
-	if err != nil {
-		return nil, fmt.Errorf("fsutil.SubdirsContaining %q: %w", dir, err)
-	}
-	dirs := make([]string, 0, len(entries))
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		sub := path.Join(dir, e.Name())
-		if hasMarker(fsys, sub, marker) {
-			dirs = append(dirs, sub)
-		}
-	}
-	return dirs, nil
+// Found is the result of a discovery walk: the directories that hold the marker, and
+// every entry that could not be judged.
+type Found struct {
+	Dirs    []string  // slash paths joined onto the walked dir
+	Skipped []Skipped // entries left out because they could not be read
 }
 
-// SubdirsContainingAny unions SubdirsContaining across dirs, deduplicating
-// repeated subdirectory paths and preserving order — dirs in the given order,
-// subdirectories sorted within each. A dir that does not exist is skipped,
-// modelling an optional root absent in the current environment; any other read
-// error is returned, so a permission fault is surfaced rather than hidden. This
-// is the multi-root discovery shape (scan several candidate parents at once).
-func SubdirsContainingAny(fsys fs.FS, dirs []string, marker string) ([]string, error) {
-	var out []string
+// Skipped is a directory entry a walk could not judge, and why. It is reported rather
+// than dropped: an entry nobody checked must not read as one that was checked and found
+// to hold nothing.
+type Skipped struct {
+	Path   string `json:"path"`   // slash path within the walked filesystem
+	Reason string `json:"reason"` // the error that stopped the walk reading it
+}
+
+// SubdirsContaining returns the immediate subdirectories of dir (within fsys) that
+// directly contain a file named marker, as slash paths joined onto dir, sorted by name.
+//
+// Directories are decided with fs.Stat rather than DirEntry.IsDir, so a symbolic link
+// to a directory counts as one. Given an fs.FS from os.Root.FS, a link that leaves the
+// root cannot be followed; it, and any other entry or marker that cannot be read, is
+// returned in Skipped with the error that stopped it. A marker that simply does not
+// exist is not a skip: that directory is not a match.
+//
+// It returns an error if dir itself cannot be read. Pass "." for the root of fsys.
+func SubdirsContaining(fsys fs.FS, dir, marker string) (Found, error) {
+	entries, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		return Found{}, fmt.Errorf("fsutil.SubdirsContaining %q: %w", dir, err)
+	}
+	found := Found{Dirs: make([]string, 0, len(entries))}
+	for _, e := range entries {
+		sub := path.Join(dir, e.Name())
+		info, err := fs.Stat(fsys, sub)
+		if err != nil {
+			found.Skipped = append(found.Skipped, Skipped{Path: sub, Reason: err.Error()})
+			continue
+		}
+		if !info.IsDir() {
+			continue
+		}
+		switch _, err := fs.Stat(fsys, path.Join(sub, marker)); {
+		case err == nil:
+			found.Dirs = append(found.Dirs, sub)
+		case !errors.Is(err, fs.ErrNotExist):
+			found.Skipped = append(
+				found.Skipped,
+				Skipped{Path: path.Join(sub, marker), Reason: err.Error()},
+			)
+		}
+	}
+	return found, nil
+}
+
+// SubdirsContainingAny unions SubdirsContaining across dirs, deduplicating repeated
+// subdirectory paths and preserving order — dirs in the given order, subdirectories
+// sorted within each. A dir that does not exist is skipped, modelling an optional root
+// absent in the current environment; any other read error is returned, so a permission
+// fault is surfaced rather than hidden. This is the multi-root discovery shape.
+func SubdirsContainingAny(fsys fs.FS, dirs []string, marker string) (Found, error) {
+	var out Found
 	seen := make(map[string]bool)
 	for _, dir := range dirs {
-		subs, err := SubdirsContaining(fsys, dir, marker)
+		found, err := SubdirsContaining(fsys, dir, marker)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
-			return nil, err
+			return Found{}, err
 		}
-		for _, sub := range subs {
+		for _, sub := range found.Dirs {
 			if !seen[sub] {
 				seen[sub] = true
-				out = append(out, sub)
+				out.Dirs = append(out.Dirs, sub)
 			}
 		}
+		out.Skipped = append(out.Skipped, found.Skipped...)
 	}
 	return out, nil
-}
-
-// hasMarker reports whether a file named marker exists directly inside dir.
-func hasMarker(fsys fs.FS, dir, marker string) bool {
-	_, err := fs.Stat(fsys, path.Join(dir, marker))
-	return err == nil
 }

@@ -9,6 +9,7 @@ package skill
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -25,6 +26,10 @@ import (
 
 // FileName is the required filename inside a skill directory.
 const FileName = "SKILL.md"
+
+// ErrUnterminatedFrontmatter is the FrontmatterErr of a SKILL.md whose first line opens a
+// frontmatter block that no later line closes.
+var ErrUnterminatedFrontmatter = errors.New("the opening --- has no closing --- line")
 
 // Skill is a parsed SKILL.md and its location.
 type Skill struct {
@@ -64,6 +69,13 @@ type Skill struct {
 	FrontmatterErr error
 }
 
+// Discovery is the result of a discovery walk: the skill directories found, and every
+// entry the walk could not judge.
+type Discovery struct {
+	Dirs    []string         // OS paths of skill directories, sorted within each root
+	Skipped []fsutil.Skipped // entries that could not be read, with paths under the walked base
+}
+
 // Load reads and parses <dir>/SKILL.md. A missing SKILL.md is translated at this
 // boundary to an errs.Error with code ENOTFOUND (classify it via errs.ErrorCode);
 // the external os.ErrNotExist is not propagated. Any other read error is wrapped
@@ -89,35 +101,79 @@ func (s *Skill) Hash() string { return identity.Hash(s.Raw) }
 // DefaultRoots returns the runtime-neutral directories a multi-root discovery
 // scans. The darwin source hard-codes .claude/skills, but runtime neutrality
 // requires covering every skills-compatible runtime.
+//
+// .pi/skills is the Pi coding agent's project root. Pi also reads .agents/skills, but
+// a skill installed for Pi alone lives under .pi/skills and would otherwise be invisible.
 func DefaultRoots() []string {
 	return []string{
 		".claude/skills",
 		".cursor/skills",
 		".codex/skills",
 		".agents/skills",
+		".pi/skills",
 	}
 }
 
-// Discover returns every immediate subdirectory of tree that contains a
-// SKILL.md, sorted by name. It errors if tree cannot be read. This is the
-// single-tree walk the exegesis gates iterate over.
+// DiscoverTree returns every immediate subdirectory of tree that contains a SKILL.md, and
+// every entry it could not judge. It errors if tree cannot be opened or read. This is the
+// single-tree walk the gates iterate over, and the gates must use it rather than Discover:
+// a skipped entry is a finding about the tree, and only this reports it.
+//
+// The walk is contained in tree (os.OpenRoot). A symbolic link inside the tree resolves,
+// so a linked skill directory is found; a link that leaves the tree is not followed and
+// is reported in Skipped. A packaged skill tree is copied by installers, and a link out of
+// it would not survive the copy. A link with an absolute target is reported too, even one
+// that names a path inside the tree: os.Root refuses absolute targets, and an absolute
+// path into a source checkout is equally broken once the tree is copied elsewhere.
+func DiscoverTree(tree string) (Discovery, error) {
+	return walkRoot(tree, func(fsys fs.FS) (fsutil.Found, error) {
+		return fsutil.SubdirsContaining(fsys, ".", FileName)
+	})
+}
+
+// Discover returns the skill directories DiscoverTree finds, without the skipped
+// entries. It is for callers that act on the skills a tree holds; a caller that judges
+// the tree itself must call DiscoverTree, or it will read an unreadable entry as absent.
 func Discover(tree string) ([]string, error) {
-	subs, err := fsutil.SubdirsContaining(os.DirFS(tree), ".", FileName)
-	if err != nil {
-		return nil, fmt.Errorf("discover %s: %w", tree, err)
-	}
-	return joinFS(tree, subs), nil
+	d, err := DiscoverTree(tree)
+	return d.Dirs, err
 }
 
-// DiscoverRoots returns every skill directory under any of roots (relative to
-// base), skipping roots absent in this environment and deduplicating. This is
-// the multi-runtime scan skillsaw's "--all" performs.
-func DiscoverRoots(base string, roots []string) ([]string, error) {
-	subs, err := fsutil.SubdirsContainingAny(os.DirFS(base), roots, FileName)
+// DiscoverRoots returns every skill directory under any of roots (relative to base),
+// skipping roots absent in this environment and deduplicating. This is the
+// multi-runtime scan skillsaw's "--all" performs.
+//
+// The walk is contained in base rather than in each root, because installers link
+// between roots: `npx skills` links ~/.claude/skills/<name> to ~/.agents/skills/<name>.
+// Such a link leaves its root but not the base, and the harness follows it, so this does
+// too. A link that leaves base is reported in Skipped.
+func DiscoverRoots(base string, roots []string) (Discovery, error) {
+	return walkRoot(base, func(fsys fs.FS) (fsutil.Found, error) {
+		return fsutil.SubdirsContainingAny(fsys, roots, FileName)
+	})
+}
+
+// walkRoot runs walk over an os.Root opened on base, then turns its slash paths into OS
+// paths under base.
+func walkRoot(base string, walk func(fs.FS) (fsutil.Found, error)) (Discovery, error) {
+	root, err := os.OpenRoot(base)
 	if err != nil {
-		return nil, fmt.Errorf("discover roots under %s: %w", base, err)
+		return Discovery{}, fmt.Errorf("discover %s: %w", base, err)
 	}
-	return joinFS(base, subs), nil
+	found, err := walk(root.FS())
+	// Closed here rather than deferred so a close failure is reported, not dropped; the
+	// walk has finished with the root by now.
+	if closeErr := root.Close(); err == nil && closeErr != nil {
+		err = closeErr
+	}
+	if err != nil {
+		return Discovery{}, fmt.Errorf("discover %s: %w", base, err)
+	}
+	d := Discovery{Dirs: joinFS(base, found.Dirs), Skipped: found.Skipped}
+	for i := range d.Skipped {
+		d.Skipped[i].Path = filepath.Join(base, filepath.FromSlash(d.Skipped[i].Path))
+	}
+	return d, nil
 }
 
 // Slug normalizes a string to the Agent Skills slug form: lowercase, every run
@@ -164,6 +220,12 @@ func (s *Skill) parse() {
 	// Raw is left exactly as read: Hash is the content identity over those bytes, and
 	// frontmatter.Split normalizes line endings only for what it returns.
 	s.Frontmatter, s.Body = frontmatter.Split(s.Raw)
+	if frontmatter.Unterminated(s.Raw) {
+		// Without this the file reads as having no header, and every check reports the
+		// fields as missing from a header that is right there, only unclosed.
+		s.FrontmatterErr = ErrUnterminatedFrontmatter
+		return
+	}
 
 	// Ordered/unordered does not matter for the allowlist check; a map suffices
 	// and also yields the top-level keys exegesis lint needs.
