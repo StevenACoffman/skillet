@@ -92,3 +92,58 @@ func TestScanMultiFileOrdering(t *testing.T) {
 		t.Errorf("hit1 = %+v, want b.md:2", hits[1])
 	}
 }
+
+func TestDynamicContext(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		content   string
+		wantLines []int
+	}{
+		"inline command at line start": {
+			content:   "## Current State\n!`git status --short`\n",
+			wantLines: []int{2},
+		},
+		"inline command mid-line": {
+			content:   "Branch: !`git branch --show-current`\n",
+			wantLines: []int{1},
+		},
+		"a literal ! in a code span is prose": {
+			content: "Prefix `!` to negate a glob, evaluated before `.vale.ini`.\n",
+		},
+		"bang fence is dynamic context": {
+			content:   "intro\n```!\ngit log -1\n```\n",
+			wantLines: []int{2},
+		},
+		"an example inside an ordinary fence is documentation": {
+			content: "```markdown\nRun !`date` here\n```\n",
+		},
+		"inline form after an example fence closes is reported": {
+			content:   "```\nx\n```\nNow !`date`\n",
+			wantLines: []int{4},
+		},
+		"CRLF line numbers": {
+			content:   "a\r\n!`pwd`\r\n",
+			wantLines: []int{2},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			hits := neutrality.DynamicContext(
+				[]neutrality.NamedFile{{Name: "SKILL.md", Content: tc.content}},
+			)
+			got := make([]int, 0, len(hits))
+			for _, h := range hits {
+				got = append(got, h.Line)
+			}
+			if len(got) != len(tc.wantLines) {
+				t.Fatalf("lines = %v, want %v", got, tc.wantLines)
+			}
+			for i := range got {
+				if got[i] != tc.wantLines[i] {
+					t.Errorf("lines = %v, want %v", got, tc.wantLines)
+				}
+			}
+		})
+	}
+}
