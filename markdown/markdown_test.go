@@ -1,6 +1,7 @@
 package markdown_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -204,5 +205,16 @@ func TestTheSecondParseKeepsGFM(t *testing.T) {
 	// A code span inside a table cell is blanked only if the table parsed as a table.
 	if strings.Contains(got.Prose, "x y") {
 		t.Errorf("a code span in a table cell was not blanked: %q", got.Prose)
+	}
+}
+
+func TestLinkDestinationsExcludeCodeSpans(t *testing.T) {
+	t.Parallel()
+	// Links mixes code spans in for reference resolution; LinkDestinations must not, or a
+	// broken-link check would judge `foo.md` written as code as a link to foo.md.
+	doc := markdown.Parse("See [a](a.md), ![i](i.png) and `b.md`.\n\n```\n[c](c.md)\n```\n")
+	want := []string{"a.md", "i.png"}
+	if !reflect.DeepEqual(doc.LinkDestinations, want) {
+		t.Errorf("LinkDestinations = %q, want %q", doc.LinkDestinations, want)
 	}
 }

@@ -39,8 +39,13 @@ type Doc struct {
 	// of these is a command this document claims its repository supports — cannot use
 	// that slice without treating destinations as candidates. Separate rather than
 	// splitting Links, which four consumers read.
-	CodeSpans      []string
-	HasOrderedList bool
+	CodeSpans []string
+
+	// LinkDestinations is the destination of every link and image, in document order,
+	// without the code-span contents Links mixes in. A consumer asking whether a link
+	// resolves must not treat a code span as a link.
+	LinkDestinations []string
+	HasOrderedList   bool
 	// HasCodeBlock reports a fenced or indented code block, never an inline code span.
 	//
 	// It is a derived fact, and consumers use it to decide whether a check applies at
@@ -82,12 +87,13 @@ func Parse(body string) *Doc {
 	code := codeParser().Parser().Parse(text.NewReader(src))
 	blocks := children(root)
 	return &Doc{
-		Sections:       sections(blocks, src),
-		Prose:          prose(code, src),
-		Links:          links(root, src),
-		CodeSpans:      codeSpans(root, src),
-		HasOrderedList: hasOrderedList(root),
-		HasCodeBlock:   hasCodeBlock(code),
+		Sections:         sections(blocks, src),
+		Prose:            prose(code, src),
+		Links:            links(root, src),
+		CodeSpans:        codeSpans(root, src),
+		LinkDestinations: linkDestinations(root),
+		HasOrderedList:   hasOrderedList(root),
+		HasCodeBlock:     hasCodeBlock(code),
 	}
 }
 
@@ -246,6 +252,25 @@ func links(root ast.Node, src []byte) []string {
 		case ast.KindCodeSpan:
 			out = append(out, nodeText(n, src))
 			return ast.WalkSkipChildren, nil
+		}
+		return ast.WalkContinue, nil
+	})
+	return out
+}
+
+// linkDestinations collects link and image destinations in document order. A link
+// inside a code span or block is code, not a link, and goldmark does not parse it as one.
+func linkDestinations(root ast.Node) []string {
+	var out []string
+	_ = ast.Walk(root, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		switch n := n.(type) {
+		case *ast.Link:
+			out = append(out, string(n.Destination))
+		case *ast.Image:
+			out = append(out, string(n.Destination))
 		}
 		return ast.WalkContinue, nil
 	})
