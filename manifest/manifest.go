@@ -15,8 +15,20 @@ import (
 	"sort"
 )
 
+// Format identifies the skills-manifest.json layout this package writes and reads.
+//
+// It is a name for a set of field meanings, not a version of this package: it changes
+// only when a field changes meaning or a reader would misread a new manifest, and an
+// identifier is never reused for different contents. Adding an optional field that an
+// older reader may ignore does not change it.
+const Format = "skills-manifest/1"
+
 // Manifest is the top-level skills-manifest.json document.
 type Manifest struct {
+	// Format is the layout identifier; Build sets it to the Format constant. Empty means a
+	// manifest written before the field existed, which is read as the current layout
+	// because nothing about the layout changed when the field was added.
+	Format            string  `json:"format"`
 	Tool              string  `json:"tool"`               // the emitting tool, e.g. "exegesis"
 	Tree              string  `json:"tree"`               // the verified tree path
 	StructureVerified bool    `json:"structure_verified"` // true iff every gate passed
@@ -165,6 +177,7 @@ func Build(tool, tree string, skills []Skill, verified bool) Manifest {
 	copy(sorted, skills)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Slug < sorted[j].Slug })
 	return Manifest{
+		Format:            Format,
 		Tool:              tool,
 		Tree:              tree,
 		StructureVerified: verified,
@@ -181,7 +194,10 @@ func Build(tool, tree string, skills []Skill, verified bool) Manifest {
 // Every manifest written by a tool in this family sets "tool", so its absence
 // identifies the wrong-file case without rejecting any genuine manifest.
 //
-// Unknown fields are ignored, so a manifest from a newer tool still reads.
+// Unknown fields are ignored, so a manifest from a newer tool that only added fields still
+// reads. A manifest declaring a different Format is rejected instead: its fields may mean
+// something else, and reading them as this layout would be a silent misreading rather
+// than a skipped extra. An absent Format is a manifest written before the field existed.
 //
 // Ensures: the result round-trips a Marshal of the same manifest; it is pure.
 func Parse(data []byte) (Manifest, error) {
@@ -191,6 +207,10 @@ func Parse(data []byte) (Manifest, error) {
 	}
 	if m.Tool == "" {
 		return Manifest{}, errors.New(`parse manifest: no "tool" field; not a skills manifest`)
+	}
+	if m.Format != "" && m.Format != Format {
+		return Manifest{}, fmt.Errorf(
+			"parse manifest: format %q is not %q; upgrade the reading tool", m.Format, Format)
 	}
 	return m, nil
 }

@@ -117,6 +117,49 @@ func TestParseIgnoresUnknownFields(t *testing.T) {
 	}
 }
 
+func TestParseFormat(t *testing.T) {
+	t.Parallel()
+	// The format field is what lets a reader tell a changed layout from extra fields.
+	// Absent is a manifest written before the field existed; any other value is a
+	// layout this reader does not know, and reading it anyway would misread it.
+	cases := map[string]struct {
+		in      string
+		wantErr bool
+	}{
+		"current format reads": {
+			in: `{"format":"skills-manifest/1","tool":"exegesis","tree":"/t","skills":[]}`,
+		},
+		"absent format reads as a pre-version manifest": {
+			in: `{"tool":"exegesis","tree":"/t","skills":[]}`,
+		},
+		"unknown format is rejected": {
+			in:      `{"format":"skills-manifest/2","tool":"exegesis","tree":"/t","skills":[]}`,
+			wantErr: true,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := manifest.Parse([]byte(tc.in))
+			if gotErr := err != nil; gotErr != tc.wantErr {
+				t.Errorf("Parse error = %v, want error %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestBuildWritesTheFormat(t *testing.T) {
+	t.Parallel()
+	m := manifest.Build("exegesis", "/t", nil, true)
+	b, err := m.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"format": "skills-manifest/1"`) {
+		t.Errorf("marshalled manifest does not declare its format:\n%s", b)
+	}
+}
+
 // tree assembles a scanned-side manifest the way a caller does: a struct literal, since
 // Tool and StructureVerified have no meaning before verification has run.
 func tree(root string, skills ...manifest.Skill) manifest.Manifest {
