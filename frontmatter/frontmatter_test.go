@@ -43,6 +43,16 @@ func TestSplit(t *testing.T) {
 			wantBody:  "body\n",
 			why:       "a caller that forgets to normalize gets no error, just empty fields",
 		},
+		"a leading byte-order mark does not hide the header": {
+			in:        "\ufeff---\ntitle: x\n---\nbody\n",
+			wantBlock: "title: x",
+			wantBody:  "body\n",
+			why:       "editors saving UTF-8 with BOM put U+FEFF before the delimiter",
+		},
+		"a byte-order mark after offset 0 is content": {
+			in:       "x\ufeff\n",
+			wantBody: "x\ufeff\n",
+		},
 		"no trailing newline after the close": {
 			in:        "---\ntitle: x\n---",
 			wantBlock: "title: x",
@@ -101,5 +111,28 @@ func TestSplitNeverLeavesADelimiterInTheBody(t *testing.T) {
 		if len(body) >= 3 && body[:3] == "---" {
 			t.Errorf("Split(%q) left a delimiter at the head of the body: %q", in, body)
 		}
+	}
+}
+
+func TestUnterminated(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct {
+		in   string
+		want bool
+	}{
+		"well-formed header":              {"---\nname: x\n---\nbody\n", false},
+		"no header":                       {"body\n", false},
+		"empty header":                    {"---\n---\nbody\n", false},
+		"never closed":                    {"---\nname: x\ndescription: d\n# Title\n", true},
+		"closing glued to the last value": {"---\nname: x\ndescription: \"d\"---\nbody\n", true},
+		"never closed, CRLF and BOM":      {"\ufeff---\r\nname: x\r\n", true},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := frontmatter.Unterminated(tc.in); got != tc.want {
+				t.Errorf("Unterminated(%q) = %v, want %v", tc.in, got, tc.want)
+			}
+		})
 	}
 }
