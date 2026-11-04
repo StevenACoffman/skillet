@@ -24,6 +24,22 @@ type Section struct {
 	Level int
 	Title string
 	Units int
+
+	// Start and End are the section's half-open byte range [Start, End) in the body Parse
+	// was given: from the start of the heading's line to the start of the next heading of the
+	// same or higher level, or to the end of the body. It covers the same content Units
+	// counts, sub-sections included.
+	//
+	// **They exist so a caller can ask whether text sits under a heading, not only whether
+	// the heading exists.** canonizer cites a source as `§Heading: "quotation"` and could
+	// check only the quotation's presence and the heading's existence; a quotation from one
+	// section cited under another passed. A span answers that without a second Markdown
+	// parser in the caller, which would disagree with this one on setext headings and on `#`
+	// inside a fence.
+	//
+	// Byte offsets rather than lines, because the caller's question is a substring search and
+	// a byte range is what slicing the body needs.
+	Start, End int
 }
 
 // Doc is the parsed view of a SKILL.md body.
@@ -150,6 +166,9 @@ func children(root ast.Node) []ast.Node {
 
 // sections builds one Section per heading, counting content units until the next
 // heading of the same or higher level.
+//
+// Ensures: every Section satisfies 0 <= Start <= End <= len(src), and Start is the offset of
+// the first byte of its heading's line; sections appear in document order.
 func sections(blocks []ast.Node, src []byte) []Section {
 	var out []Section
 	for i, n := range blocks {
@@ -158,15 +177,55 @@ func sections(blocks []ast.Node, src []byte) []Section {
 			continue
 		}
 		units := 0
+		end := len(src)
 		for j := i + 1; j < len(blocks); j++ {
 			if h2, ok := blocks[j].(*ast.Heading); ok && h2.Level <= h.Level {
+				end = blockStart(blocks, j, src)
 				break
 			}
 			units += unitCount(blocks[j], src)
 		}
-		out = append(out, Section{Level: h.Level, Title: nodeText(n, src), Units: units})
+		out = append(out, Section{
+			Level: h.Level, Title: nodeText(n, src), Units: units,
+			Start: blockStart(blocks, i, src), End: end,
+		})
 	}
 	return out
+}
+
+// blockStart returns the offset of the first byte of the line on which blocks[i] begins.
+//
+// A heading's first segment starts at its text, after the `#` markers and spaces, so the
+// line start is found by scanning back to the previous newline. That is also right for a
+// setext heading, whose first segment is its text line.
+//
+// **An empty heading carries no segment at all** (goldmark records none for a bare `#`), so
+// there is nothing to scan back from. It falls back to the end of the previous block's last
+// line, which is the earliest place the heading can start; for the first block, 0.
+//
+// Requires: 0 <= i < len(blocks), and every block was parsed from src.
+// Ensures:  0 <= result <= len(src); it is pure.
+func blockStart(blocks []ast.Node, i int, src []byte) int {
+	if lines := blocks[i].Lines(); lines.Len() > 0 {
+		return lineStart(src, lines.At(0).Start)
+	}
+	for k := i - 1; k >= 0; k-- {
+		if lines := blocks[k].Lines(); lines.Len() > 0 {
+			return min(lines.At(lines.Len()-1).Stop, len(src))
+		}
+	}
+	return 0
+}
+
+// lineStart returns the offset just after the newline preceding pos, or 0.
+//
+// Requires: 0 <= pos <= len(src).
+// Ensures:  0 <= result <= pos; it is pure.
+func lineStart(src []byte, pos int) int {
+	for pos > 0 && src[pos-1] != '\n' {
+		pos--
+	}
+	return pos
 }
 
 // unitCount returns how many concrete content points a block contributes: one per
