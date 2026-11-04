@@ -8,6 +8,15 @@ import (
 	"github.com/StevenACoffman/skillet/markdown"
 )
 
+// spanCase is one section's expected span: the text it starts with, what it must hold, and
+// what belongs to some other section.
+type spanCase struct {
+	title    string
+	wantHead string
+	within   []string
+	without  []string
+}
+
 func TestParseSections(t *testing.T) {
 	t.Parallel()
 	body := "# Title\n\nIntro paragraph that is well over twenty characters long.\n\n" +
@@ -216,5 +225,93 @@ func TestLinkDestinationsExcludeCodeSpans(t *testing.T) {
 	want := []string{"a.md", "i.png"}
 	if !reflect.DeepEqual(doc.LinkDestinations, want) {
 		t.Errorf("LinkDestinations = %q, want %q", doc.LinkDestinations, want)
+	}
+}
+
+// TestASectionsSpanCoversItsHeadingAndBody pins the contract canonizer relies on: slicing the
+// body by a section's span gives that section's heading line and everything under it, up to
+// the next heading of the same or higher level.
+func TestASectionsSpanCoversItsHeadingAndBody(t *testing.T) {
+	t.Parallel()
+
+	body := "Preamble.\n\n" +
+		"# One\n\nUnder one.\n\n" +
+		"## One.A\n\nUnder one-a.\n\n" +
+		"```\n# not a heading\n```\n\n" +
+		"Setext two\n==========\n\nUnder two.\n\n" +
+		"#\n\nAfter an empty heading.\n"
+
+	cases := []spanCase{{
+		title:    "One",
+		wantHead: "# One\n",
+		within:   []string{"Under one.", "## One.A", "Under one-a.", "# not a heading"},
+		without:  []string{"Preamble.", "Setext two", "Under two."},
+	}, {
+		title:    "One.A",
+		wantHead: "## One.A\n",
+		within:   []string{"Under one-a.", "# not a heading"},
+		without:  []string{"Under one.", "Setext two"},
+	}, {
+		// A setext heading starts at its text line, and ends a level-1 section before it.
+		title:    "Setext two",
+		wantHead: "Setext two\n===",
+		within:   []string{"Under two."},
+		without:  []string{"Under one-a.", "After an empty heading."},
+	}, {
+		// goldmark records no segment for a bare `#`; the span still ends the body.
+		title:    "",
+		wantHead: "",
+		within:   []string{"After an empty heading."},
+		without:  []string{"Under two."},
+	}}
+
+	doc := markdown.Parse(body)
+	if len(doc.Sections) != len(cases) {
+		t.Fatalf("want %d sections, got %d: %+v", len(cases), len(doc.Sections), doc.Sections)
+	}
+	for i, c := range cases {
+		s := doc.Sections[i]
+		t.Run(c.title, func(t *testing.T) {
+			t.Parallel()
+			assertSpan(t, body, s, &c)
+		})
+	}
+}
+
+// assertSpan checks one section's span against c.
+func assertSpan(t *testing.T, body string, s markdown.Section, c *spanCase) {
+	t.Helper()
+	if s.Title != c.title {
+		t.Fatalf("title = %q, want %q", s.Title, c.title)
+	}
+	if s.Start < 0 || s.Start > s.End || s.End > len(body) {
+		t.Fatalf("span [%d, %d) is outside the body of %d bytes", s.Start, s.End, len(body))
+	}
+	got := body[s.Start:s.End]
+	if !strings.HasPrefix(strings.TrimLeft(got, "\n"), c.wantHead) {
+		t.Errorf("span starts %q, want it to start with %q", got[:min(len(got), 20)], c.wantHead)
+	}
+	for _, w := range c.within {
+		if !strings.Contains(got, w) {
+			t.Errorf("span lacks %q:\n%s", w, got)
+		}
+	}
+	for _, w := range c.without {
+		if strings.Contains(got, w) {
+			t.Errorf("span holds %q, which belongs to another section:\n%s", w, got)
+		}
+	}
+}
+
+// TestTheLastSectionRunsToTheEndOfTheBody covers the case no following heading bounds.
+func TestTheLastSectionRunsToTheEndOfTheBody(t *testing.T) {
+	t.Parallel()
+	body := "# Only\n\nText with no trailing newline"
+	doc := markdown.Parse(body)
+	if len(doc.Sections) != 1 {
+		t.Fatalf("want 1 section, got %+v", doc.Sections)
+	}
+	if s := doc.Sections[0]; s.Start != 0 || s.End != len(body) {
+		t.Errorf("span = [%d, %d), want [0, %d)", s.Start, s.End, len(body))
 	}
 }
