@@ -34,7 +34,9 @@ import (
 // It is 4. Version 1 was the version reader itself, which changed no grammar; version 2
 // adds the ⚖ warrant marker; version 3 adds the Limitations: header and the ⊨ check marker,
 // batched into one bump because each is a grammar change and shipping them apart would
-// migrate every stored ruleset twice; version 4 adds the frontmatter block's verified key.
+// migrate every stored ruleset twice; version 4 adds the frontmatter block's verified key;
+// version 5 adds no vocabulary and changes only the layout, for a document that declares it
+// (see githubLayout).
 //
 // **Version 4 is a bump rather than a tolerated unknown key, and the alternative is worse.**
 // An unmodelled verified: already parses without error and is then dropped by Render, so
@@ -46,7 +48,7 @@ import (
 // A document is only *written* at a version when it uses something that version introduced
 // -- see formatOf -- so every ruleset written before still renders byte-identically, which
 // is the property the reader was shipped early to protect.
-const FormatVersion = 4
+const FormatVersion = githubLayout
 
 // Severity is how strictly a Rule is enforced.
 const (
@@ -238,6 +240,13 @@ func readFrontmatter(md string) (frontmatterBlock, string, error) {
 // v1 document rather than a malformed one, and never above what its content requires, which
 // is what keeps a corpus of warrant-free rulesets rendering byte-identically.
 func formatOf(rs *Ruleset) int {
+	// Version 5 is chosen, never required: no content needs it, so a document is at 5 only
+	// because it declared 5. Kept first and kept separate from the clauses below, so a
+	// verified document that declared 5 is not pulled back to 4, while 1 to 4 behave
+	// exactly as they did.
+	if rs.Format >= githubLayout {
+		return rs.Format
+	}
 	// First, because the clauses below return early and run highest-version-first: a
 	// verified ruleset that declares no Limitations: must not fall through to 3.
 	if len(rs.Verified) > 0 {
@@ -332,34 +341,47 @@ func Render(rs *Ruleset) string {
 	if rs.Limitations != "" {
 		fmt.Fprintf(&b, "Limitations: %s\n", rs.Limitations)
 	}
+	githubFormat := formatOf(rs) >= githubLayout
+	sections := ruleIDs(rs)
 	for i := range rs.Rules {
-		r := &rs.Rules[i]
 		b.WriteString("\n")
-		fmt.Fprintf(&b, "§%s  [%s][%s]  %s\n", r.Section, r.Severity, r.Level, r.Statement)
-		if r.Rationale != "" {
-			fmt.Fprintf(&b, "%s%s\n", indent, r.Rationale)
-		}
-		if r.Bad != "" {
-			fmt.Fprintf(&b, "%s✗  %s\n", indent, r.Bad)
-		}
-		if r.Good != "" {
-			fmt.Fprintf(&b, "%s✓  %s\n", indent, r.Good)
-		}
-		if r.SourceAnchor != "" {
-			fmt.Fprintf(&b, "%s↦  %s\n", indent, r.SourceAnchor)
-		}
-		if r.Warrant.Present() {
-			fmt.Fprintf(&b, "%s⚖  %s %s  %s\n",
-				indent, r.Warrant.By, r.Warrant.At, r.Warrant.Rationale)
-		}
-		// One line per check, in the order given: a rule's checks are a conjunction, and
-		// re-ordering them on render would change the bytes without changing the meaning,
-		// which is what the inert-render property forbids.
-		for _, c := range r.Checks {
-			fmt.Fprintf(&b, "%s⊨  %s  %s\n", indent, c.Op, c.Arg)
+		if githubFormat {
+			renderGitHubRule(&b, &rs.Rules[i], sections)
+		} else {
+			renderRule(&b, &rs.Rules[i])
 		}
 	}
 	return b.String()
+}
+
+// renderRule writes one rule in the layout of versions 1 to 4.
+//
+// Ensures: it writes exactly the bytes Render wrote for a rule before version 5 existed,
+// which is the inert-render property TestAWarrantFreeRulesetStillRendersNoBlock guards.
+func renderRule(b *strings.Builder, r *Rule) {
+	fmt.Fprintf(b, "§%s  [%s][%s]  %s\n", r.Section, r.Severity, r.Level, r.Statement)
+	if r.Rationale != "" {
+		fmt.Fprintf(b, "%s%s\n", indent, r.Rationale)
+	}
+	if r.Bad != "" {
+		fmt.Fprintf(b, "%s✗  %s\n", indent, r.Bad)
+	}
+	if r.Good != "" {
+		fmt.Fprintf(b, "%s✓  %s\n", indent, r.Good)
+	}
+	if r.SourceAnchor != "" {
+		fmt.Fprintf(b, "%s↦  %s\n", indent, r.SourceAnchor)
+	}
+	if r.Warrant.Present() {
+		fmt.Fprintf(b, "%s⚖  %s %s  %s\n",
+			indent, r.Warrant.By, r.Warrant.At, r.Warrant.Rationale)
+	}
+	// One line per check, in the order given: a rule's checks are a conjunction, and
+	// re-ordering them on render would change the bytes without changing the meaning,
+	// which is what the inert-render property forbids.
+	for _, c := range r.Checks {
+		fmt.Fprintf(b, "%s⊨  %s  %s\n", indent, c.Op, c.Arg)
+	}
 }
 
 // Parse reads the canonical form Render emits. A malformed rule header, an
@@ -383,7 +405,7 @@ func Parse(md string) (Ruleset, error) {
 			cur = nil
 		}
 	}
-	for _, line := range strings.Split(md, "\n") {
+	for _, line := range layoutLines(rs.Format, strings.Split(md, "\n")) {
 		trimmed := strings.TrimSpace(line)
 		switch {
 		case applyMeta(&rs, line):
@@ -401,6 +423,7 @@ func Parse(md string) (Ruleset, error) {
 		}
 	}
 	flush()
+	unlinkRules(&rs)
 	return rs, nil
 }
 

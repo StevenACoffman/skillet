@@ -110,6 +110,7 @@ func TestFormatVersionTracksTheMarkerSet(t *testing.T) {
 		2: 4, // + ⚖
 		3: 5, // + ⊨ (Limitations: rides the same bump but is a header, not a marker)
 		4: 5, // unchanged: verified: is a frontmatter key, not body vocabulary
+		5: 5, // unchanged: the GitHub layout changes how lines are written, not which
 	}
 	want, recorded := markersAt[ruleset.FormatVersion]
 	if !recorded {
